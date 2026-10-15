@@ -297,7 +297,7 @@ Item {
             if (r.image) { t[r.image] = true; sf.temps = t }
             sf.files = sf.files.concat(more)
             sf.at = sf.files.length - 1
-          } else if (r.text) cap.insert(cap.cursorPosition, r.text.replace(/\n/g, " "))
+          } else if (r.text) cap.insert(cap.cursorPosition, r.text)
         })
       }
       Column {
@@ -350,29 +350,53 @@ Item {
         Row {
           width: parent.width
           spacing: host.t.sp(12)
+          // The caption, as the message box: it grows to a few lines,
+          // Shift+Enter breaks one (Enter, when Enter doesn't send).
           Rectangle {
             width: parent.width - host.t.sp(60)
-            height: host.t.sp(46)
-            radius: height / 2
+            height: Math.max(host.t.sp(46), capScroll.height + host.t.sp(24))
+            radius: host.t.sp(23)
             color: host.t.field
             visible: sf.kindOf !== "audio"
-            TextInput {
-              id: cap
-              anchors.fill: parent
+            Flickable {
+              id: capScroll
+              anchors.left: parent.left
+              anchors.right: parent.right
               anchors.leftMargin: host.t.sp(18)
               anchors.rightMargin: host.t.sp(18)
-              verticalAlignment: TextInput.AlignVCenter
-              color: host.t.text
-              font.family: host.t.font
-              font.pixelSize: host.t.fsText
+              anchors.verticalCenter: parent.verticalCenter
+              height: Math.min(contentHeight, host.t.sp(120))
+              contentHeight: cap.implicitHeight
+              contentWidth: width
               clip: true
-              Component.onCompleted: forceActiveFocus()
-              Keys.onReturnPressed: sf.send()
-              Keys.onEnterPressed: sf.send()
-              Keys.onPressed: event => {
-                if (((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_V) || event.matches(StandardKey.Paste)) { sf.paste(); event.accepted = true }
+              boundsBehavior: Flickable.StopAtBounds
+              interactive: contentHeight > height
+              function ensureVisible(r) {
+                if (contentY >= r.y) contentY = r.y
+                else if (contentY + height <= r.y + r.height) contentY = r.y + r.height - height
               }
-              Text { textFormat: Text.PlainText; anchors.fill: parent; verticalAlignment: Text.AlignVCenter; visible: !cap.text; text: host.app.tr("Add a caption", "Adicione uma legenda"); color: host.t.faint; font: cap.font }
+              TextEdit {
+                id: cap
+                width: capScroll.width
+                wrapMode: TextEdit.Wrap
+                textFormat: TextEdit.PlainText
+                color: host.t.text
+                font.family: host.t.font
+                font.pixelSize: host.t.fsText
+                selectByMouse: true
+                selectionColor: host.t.alpha(host.t.accent, 0.4)
+                onCursorRectangleChanged: capScroll.ensureVisible(cursorRectangle)
+                Component.onCompleted: forceActiveFocus()
+                Keys.onPressed: event => {
+                  var ctrl = event.modifiers & Qt.ControlModifier, shift = event.modifiers & Qt.ShiftModifier
+                  if ((ctrl && event.key === Qt.Key_V) || event.matches(StandardKey.Paste)) { sf.paste(); event.accepted = true; return }
+                  if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    if (host.app.enterSends ? !shift : ctrl) { sf.send(); event.accepted = true }
+                    else if (!shift) { cap.insert(cap.cursorPosition, "\n"); event.accepted = true }
+                  }
+                }
+                Text { textFormat: Text.PlainText; width: parent.width; visible: !cap.text; text: host.app.tr("Add a caption", "Adicione uma legenda"); color: host.t.faint; font: cap.font }
+              }
             }
           }
           Rectangle {
