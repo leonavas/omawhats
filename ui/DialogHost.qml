@@ -29,7 +29,11 @@ Item {
   signal commitEdits()
   // The focus before the dialog: one with a field (the caption) takes it.
   function show(n, a) { host.args = a || {}; host.forceActiveFocus(); host.name = n }
-  function hide() { host.commitEdits(); host.name = ""; host.args = ({}) }
+  function hide() {
+    var after = host.args.onClose
+    host.commitEdits(); host.name = ""; host.args = ({})
+    if (after) after()
+  }
 
   Keys.onEscapePressed: host.hide()
 

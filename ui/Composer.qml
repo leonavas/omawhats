@@ -160,6 +160,7 @@ Item {
       box.view.replyTo = null
     }
     box.clear()
+    input.forceActiveFocus()
   }
   // The box empty again, its draft too.
   function clear() {
@@ -181,6 +182,8 @@ Item {
     args.reply = box.replyTo ? box.replyTo.id : ""
     args.caption = text
     if (text.trim()) args.onSent = function() { box.clear() }
+    // Sent or not, back to the box, for the next one.
+    args.onClose = function() { input.forceActiveFocus() }
     box.win.dialog("sendFiles", args)
     if (box.view) box.view.replyTo = null
   }
