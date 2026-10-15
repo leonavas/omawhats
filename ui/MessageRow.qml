@@ -188,7 +188,8 @@ Item {
         hovered: hover.hovered
       }
 
-      // Reactions, overlapping the bubble's bottom edge.
+      // Reactions, overlapping the bubble's bottom edge, on a pill of their
+      // own color (not the bubble's), as WhatsApp Web's: they stand out.
       Rectangle {
         visible: mi.hasReactions
         x: mi.mine ? bubble.x + bubble.width - width - r.t.sp(10) : bubble.x + r.t.sp(10)
@@ -196,7 +197,7 @@ Item {
         height: r.t.sp(26)
         width: reacRow.implicitWidth + r.t.sp(12)
         radius: height / 2
-        color: mi.mine ? r.t.bubbleOut : r.t.bubbleIn
+        color: r.t.bubbleIn
         border.width: 2
         border.color: r.t.chatBg
         Row {
@@ -205,7 +206,7 @@ Item {
           spacing: r.t.sp(2)
           Repeater {
             model: (mi.m.reactions || []).slice(0, 3)
-            delegate: Text { textFormat: Text.PlainText; required property var modelData; text: modelData.emoji; font.family: r.t.emojiFont; font.pixelSize: r.t.sp(14) }
+            delegate: Text { textFormat: Text.PlainText; required property var modelData; text: modelData.emoji; font.family: r.t.emojiFont; font.pixelSize: r.t.sp(15) }
           }
           Text {
             textFormat: Text.PlainText
