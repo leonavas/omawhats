@@ -352,6 +352,7 @@ Item {
               clip: true
               Component.onCompleted: forceActiveFocus()
               Keys.onReturnPressed: sf.send()
+              Keys.onEnterPressed: sf.send()
               Text { textFormat: Text.PlainText; anchors.fill: parent; verticalAlignment: Text.AlignVCenter; visible: !cap.text; text: host.app.tr("Add a caption", "Adicione uma legenda"); color: host.t.faint; font: cap.font }
             }
           }

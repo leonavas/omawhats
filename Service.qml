@@ -530,7 +530,9 @@ Item {
   }
 
 
-  // What the clipboard has: a picture (saved to a file) or text. cb({image}|{text}).
+  // What the clipboard has: a picture (saved to a file), files or text. A
+  // picture comes first, as on WhatsApp Web, even when a browser puts its
+  // HTML beside it. cb({image}|{files}|{text}).
   function readClipboard(cb) {
     var p = clipComponent.createObject(root, { cb: cb })
     var stamp = root.cacheDir + "/paste/" + Date.now()
@@ -542,15 +544,18 @@ Item {
   }
   Component {
     id: clipComponent
+    // Called by its id: the collector has no parent of its own, and a bare
+    // `parent` there is the Service's, so the answer never came back.
     Process {
+      id: clip
       property var cb: null
       stdout: StdioCollector {
         onStreamFinished: {
           var s = String(text)
-          if (!parent.cb) return
-          if (s.indexOf("IMAGE ") === 0) parent.cb({ image: s.slice(6).trim() })
-          else if (s.indexOf("FILES\n") === 0) parent.cb({ files: s.slice(6).split("\n").map(function(u) { return U.unfileUrl(u.trim()) }).filter(function(u) { return u.length > 0 && u.indexOf("#") !== 0 }) })
-          else parent.cb({ text: s.indexOf("TEXT\n") === 0 ? s.slice(5) : s })
+          if (!clip.cb) return
+          if (s.indexOf("IMAGE ") === 0) clip.cb({ image: s.slice(6).trim() })
+          else if (s.indexOf("FILES\n") === 0) clip.cb({ files: s.slice(6).split("\n").map(function(u) { return U.unfileUrl(u.trim()) }).filter(function(u) { return u.length > 0 && u.indexOf("#") !== 0 }) })
+          else clip.cb({ text: s.indexOf("TEXT\n") === 0 ? s.slice(5) : s })
         }
       }
       onExited: destroy()

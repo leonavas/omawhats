@@ -193,9 +193,12 @@ Item {
 
   function paste() {
     box.app.readClipboard(function(r) {
-      if (r.image) box.win.dialog("sendFiles", { chat: box.chat, files: [r.image], temp: true, reply: box.replyTo ? box.replyTo.id : "" })
-      else if (r.files && r.files.length) box.win.dialog("sendFiles", { chat: box.chat, files: r.files, reply: box.replyTo ? box.replyTo.id : "" })
-      else if (r.text) box.insert(r.text)
+      // A picture (a screenshot, say) goes to the preview, its caption and
+      // the reply with it, as one attached or dropped does.
+      if (r.image || (r.files && r.files.length)) {
+        box.win.dialog("sendFiles", { chat: box.chat, files: r.image ? [r.image] : r.files, temp: !!r.image, reply: box.replyTo ? box.replyTo.id : "" })
+        if (box.view) box.view.replyTo = null
+      } else if (r.text) box.insert(r.text)
     })
   }
 
@@ -451,7 +454,8 @@ Item {
             return
           }
           if (event.key === Qt.Key_Up && input.length === 0 && !box.editing) { if (box.editLast()) event.accepted = true; return }
-          if (ctrl && event.key === Qt.Key_V) { box.paste(); event.accepted = true; return }
+          // Shift+Insert too: the box's own paste would take text only.
+          if ((ctrl && event.key === Qt.Key_V) || event.matches(StandardKey.Paste)) { box.paste(); event.accepted = true; return }
           if (ctrl && !shift && event.key === Qt.Key_B) { box.wrap("*"); event.accepted = true; return }
           if (ctrl && !shift && event.key === Qt.Key_I) { box.wrap("_"); event.accepted = true; return }
           if (ctrl && shift && event.key === Qt.Key_X) { box.wrap("~"); event.accepted = true; return }
