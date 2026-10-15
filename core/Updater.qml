@@ -161,22 +161,43 @@ Item {
     if (u.phase !== "available") return
     if (u.how || !u.pluginId) { u.say(u.how || u.app.tr("Couldn't find where the plugin is installed", "Não foi possível achar onde o plugin está instalado")); return }
     u.phase = "updating"
-    u.say(u.app.tr("Updating WhatsApp to " + u.latest + "… the shell then restarts and the window comes back",
-                   "Atualizando o WhatsApp para " + u.latest + "… depois o shell reinicia e a janela volta"))
+    u.say(u.app.tr("Updating WhatsApp to " + u.latest + " in the terminal… the shell then restarts and the window comes back",
+                   "Atualizando o WhatsApp para " + u.latest + " no terminal… depois o shell reinicia e a janela volta"))
+    // In Omarchy's floating terminal, as the bar's system update runs: the
+    // script goes beside the note, out of the folder the update rewrites.
     // The exit code is written once the restart is over, so the new copy
     // is the one that reads it; when nothing changed (up to date, or it
     // failed) there's no restart and this copy reads it.
     run.command = ["setsid", "-f", "-w", "sh", "-c",
-      'b=$2; printf "%s\\n" "$3" >"$b.json"; rm -f "$b.rc"\n' +
-      'command -v omarchy >/dev/null 2>&1 || PATH=$PATH:${OMARCHY_PATH:-/usr/share/omarchy}/bin\n' +
-      'omarchy plugin update "$1" --yes >"$b.log" 2>&1; rc=$?\n' +
-      'if [ $rc -eq 0 ] && ! grep -q " is up to date\\.$" "$b.log"; then omarchy-restart-shell >>"$b.log" 2>&1 || rc=$?; fi\n' +
-      'echo $rc >"$b.rc"',
-      "whatsapp-claude-update", u.pluginId, u.base, u.note(u.latest)]
+      'b=$2; printf "%s\\n" "$3" >"$b.json"; rm -f "$b.rc" "$b.log"; printf "%s\\n" "$4" >"$b.sh"\n' +
+      'command -v omarchy-launch-floating-terminal-with-presentation >/dev/null 2>&1 || PATH=$PATH:${OMARCHY_PATH:-/usr/share/omarchy}/bin\n' +
+      'command -v omarchy-launch-floating-terminal-with-presentation >/dev/null 2>&1 || { echo "no omarchy-launch-floating-terminal-with-presentation" >"$b.log"; echo 127 >"$b.rc"; exit 0; }\n' +
+      'exec omarchy-launch-floating-terminal-with-presentation "$(printf "bash %q %q %q %q %q %q" "$b.sh" "$1" "$b" "$5" "$6" "$7")"',
+      "whatsapp-claude-update", u.pluginId, u.base, u.note(u.latest), u.script, u.version, u.latest, u.folder]
     run.running = true
     pickupTimer.restart()
   }
   function note(to) { return JSON.stringify({ from: u.version, to: to, open: !!u.app.windowOpen }) }
+
+  // What the terminal runs: what's new (the commits it brings), Omarchy's
+  // update, the shell's restart. $1 the plugin's id, $2 where the note
+  // goes, $3 and $4 the versions, $5 the plugin's folder.
+  readonly property string script: [
+    'id=$1 b=$2 from=$3 to=$4 dir=$5',
+    'say() { printf "\\033[34m●\\033[0m %s\\n" "$*"; }',
+    'echo',
+    'say "Updating Omawhats $from → $to"',
+    'new=$(git -C "$dir" fetch -q 2>/dev/null && git -C "$dir" log --reverse --format="    • %s" HEAD..FETCH_HEAD)',
+    '[ -n "$new" ] && printf "\\n  What\'s new:\\n%s\\n" "$new"',
+    'echo',
+    'say "omarchy plugin update $id"',
+    'omarchy plugin update "$id" --yes >"$b.log" 2>&1; rc=$?',
+    'if [ $rc -ne 0 ]; then printf "\\033[31m%s\\033[0m\\n" "$(tail -n 3 "$b.log")"',
+    'elif grep -q " is up to date\\.$" "$b.log"; then say "Already up to date"',
+    'else say "Restarting the shell"; omarchy-restart-shell >>"$b.log" 2>&1 || rc=$?; [ $rc -eq 0 ] && say "Omawhats $to is in"; fi',
+    'echo $rc >"$b.rc"',
+    'exit $rc'
+  ].join("\n")
 
   // In a session of its own: the plugin reload `omarchy plugin update` asks
   // for, and the shell's restart, end this Process, and must not end the
