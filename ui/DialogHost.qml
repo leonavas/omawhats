@@ -27,7 +27,8 @@ Item {
   // keeps what's being typed in the profile's name or about, as a click
   // elsewhere in the card does; Esc in the field drops it.
   signal commitEdits()
-  function show(n, a) { host.args = a || {}; host.name = n; host.forceActiveFocus() }
+  // The focus before the dialog: one with a field (the caption) takes it.
+  function show(n, a) { host.args = a || {}; host.forceActiveFocus(); host.name = n }
   function hide() { host.commitEdits(); host.name = ""; host.args = ({}) }
 
   Keys.onEscapePressed: host.hide()
@@ -269,7 +270,11 @@ Item {
     id: filesC
     DFrame {
       id: sf
-      readonly property var files: host.args.files || []
+      // Ctrl+V in the caption adds what the clipboard has, as WhatsApp
+      // Web's; a pasted picture is a copy of ours, gone once sent (temps).
+      property var files: (host.args.files || []).slice()
+      property var temps: ({})
+      Component.onCompleted: { var o = {}; if (host.args.temp) sf.files.forEach(function(p) { o[p] = true }); sf.temps = o }
       property int at: 0
       readonly property string currentPath: files[at] || ""
       readonly property string kindOf: host.args.asDocument ? "document" : host.args.asAudio ? "audio" : U.kindOf(currentPath)
@@ -280,9 +285,20 @@ Item {
         for (var i = 0; i < sf.files.length; i++) {
           var p = sf.files[i]
           var kind = host.args.asDocument ? "document" : host.args.asAudio ? "audio" : U.kindOf(p)
-          host.wa.sendFile(host.args.chat, p, kind, i === sf.files.length - 1 ? caption : "", i === 0 ? (host.args.reply || "") : "", !!host.args.temp)
+          host.wa.sendFile(host.args.chat, p, kind, i === sf.files.length - 1 ? caption : "", i === 0 ? (host.args.reply || "") : "", !!sf.temps[p])
         }
         host.hide()
+      }
+      function paste() {
+        host.app.readClipboard(function(r) {
+          var more = r.image ? [r.image] : (r.files || [])
+          if (more.length && !host.args.asDocument && !host.args.asAudio) {
+            var t = sf.temps
+            if (r.image) { t[r.image] = true; sf.temps = t }
+            sf.files = sf.files.concat(more)
+            sf.at = sf.files.length - 1
+          } else if (r.text) cap.insert(cap.cursorPosition, r.text.replace(/\n/g, " "))
+        })
       }
       Column {
         width: parent.width
@@ -353,6 +369,9 @@ Item {
               Component.onCompleted: forceActiveFocus()
               Keys.onReturnPressed: sf.send()
               Keys.onEnterPressed: sf.send()
+              Keys.onPressed: event => {
+                if (((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_V) || event.matches(StandardKey.Paste)) { sf.paste(); event.accepted = true }
+              }
               Text { textFormat: Text.PlainText; anchors.fill: parent; verticalAlignment: Text.AlignVCenter; visible: !cap.text; text: host.app.tr("Add a caption", "Adicione uma legenda"); color: host.t.faint; font: cap.font }
             }
           }
