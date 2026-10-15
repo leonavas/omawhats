@@ -1,0 +1,481 @@
+import QtQuick
+import QtQuick.Controls
+import Quickshell
+import "../lib/Util.js" as U
+import "../lib/Labels.js" as L
+import "../lib/Format.js" as F
+import "../lib/Registry.js" as Reg
+
+// The dialogs, over a dimmed window, as WhatsApp Web's: confirmations
+// (log out, clear or delete a chat, delete messages), forwarding, the
+// preview of files before they're sent, who reacted, the emoji picker for
+// a reaction, and the keyboard shortcuts.
+Item {
+  id: host
+  property var app: Reg.service
+  property var win
+  readonly property var t: app.theme
+  readonly property var wa: app.wa
+  property string name: ""
+  property var args: ({})
+  readonly property bool shown: name !== ""
+  visible: shown
+  z: 800
+
+  function show(n, a) { host.args = a || {}; host.name = n; host.forceActiveFocus() }
+  function hide() { host.name = ""; host.args = ({}) }
+
+  Keys.onEscapePressed: host.hide()
+
+  Rectangle {
+    anchors.fill: parent
+    color: host.t.scrim
+    MouseArea { anchors.fill: parent; onClicked: host.hide() }
+  }
+
+  Loader {
+    id: body
+    anchors.centerIn: parent
+    active: host.shown
+    sourceComponent: {
+      switch (host.name) {
+      case "logout": case "clearChat": case "deleteChat": return confirmC
+      case "deleteMsgs": return deleteC
+      case "forward": return forwardC
+      case "sendFiles": return filesC
+      case "reactions": return reactionsC
+      case "emoji": return emojiC
+      case "shortcuts": return shortcutsC
+      }
+      return null
+    }
+  }
+
+  // ------------------------------------------------------------ the card
+  component DFrame: Rectangle {
+    id: fr
+    default property alias content: inner.data
+    property string title: ""
+    property real cardWidth: host.t.sp(480)
+    width: Math.min(cardWidth, host.width - host.t.sp(40))
+    height: Math.min(inner.childrenRect.height + (title ? host.t.sp(64) : host.t.sp(24)) + host.t.sp(24), host.height - host.t.sp(40))
+    radius: host.t.sp(20)
+    color: host.t.popup
+    border.width: 1
+    border.color: host.t.line
+    MouseArea { anchors.fill: parent }
+    Text {
+      visible: fr.title !== ""
+      x: host.t.sp(24)
+      y: host.t.sp(22)
+      width: parent.width - host.t.sp(48)
+      text: fr.title
+      color: host.t.textBright
+      font.family: host.t.font
+      font.pixelSize: host.t.px(19)
+      font.weight: Font.Medium
+      wrapMode: Text.Wrap
+    }
+    Item {
+      id: inner
+      x: host.t.sp(24)
+      y: fr.title ? host.t.sp(64) : host.t.sp(24)
+      width: parent.width - host.t.sp(48)
+      height: parent.height - y - host.t.sp(24)
+    }
+  }
+
+  component Btn: Rectangle {
+    id: bt
+    property string label: ""
+    property bool primary: false
+    property bool danger: false
+    property bool enabledState: true
+    signal clicked()
+    height: host.t.sp(40)
+    width: lbl.implicitWidth + host.t.sp(40)
+    radius: height / 2
+    opacity: enabledState ? 1 : 0.45
+    color: primary ? (danger ? host.t.danger : host.t.accent) : (bma.containsMouse ? host.t.hoverStrong : "transparent")
+    border.width: primary ? 0 : 1
+    border.color: host.t.lineStrong
+    Text {
+      id: lbl
+      anchors.centerIn: parent
+      text: bt.label
+      color: bt.primary ? host.t.onColor(bt.danger ? host.t.danger : host.t.accent) : (bt.danger ? host.t.danger : host.t.accent)
+      font.family: host.t.font
+      font.pixelSize: host.t.fsText
+      font.weight: Font.Medium
+    }
+    MouseArea { id: bma; anchors.fill: parent; hoverEnabled: true; enabled: bt.enabledState; cursorShape: Qt.PointingHandCursor; onClicked: bt.clicked() }
+  }
+
+  // ------------------------------------------------------------ confirm
+  Component {
+    id: confirmC
+    DFrame {
+      id: cfr
+      readonly property var spec: {
+        var tr = host.app.tr
+        var name = host.args.chat ? host.wa.nameOf(host.args.chat) : ""
+        if (host.name === "logout") return { title: tr("Log out?", "Desconectar?"), text: tr("This computer stops being a linked device. Your chats stay on your phone.", "Este computador deixa de ser um aparelho conectado. Suas conversas continuam no celular."), ok: tr("Log out", "Desconectar"), danger: true,
+                                             run: function() { host.wa.logout() } }
+        if (host.name === "clearChat") return { title: tr("Clear this chat?", "Limpar esta conversa?"), text: tr("Messages will only be removed from this device and your devices on the newer versions of WhatsApp.", "As mensagens serão removidas apenas deste aparelho e dos seus aparelhos com as versões mais recentes do WhatsApp."), ok: tr("Clear chat", "Limpar conversa"), danger: true,
+                                                run: function() { host.wa.chatAction(host.args.chat, "clear") } }
+        return { title: tr("Delete this chat?", "Apagar esta conversa?"), text: tr("Messages will only be removed from this device and your devices on the newer versions of WhatsApp.", "As mensagens serão removidas apenas deste aparelho e dos seus aparelhos com as versões mais recentes do WhatsApp."), ok: tr("Delete chat", "Apagar conversa"), danger: true,
+                 run: function() { if (host.wa.current === host.args.chat) host.wa.close(); host.wa.chatAction(host.args.chat, "delete") } }
+      }
+      title: spec.title
+      cardWidth: host.t.sp(460)
+      Column {
+        width: parent.width
+        spacing: host.t.sp(24)
+        Text { width: parent.width; text: cfr.spec.text; color: host.t.dim; font.family: host.t.font; font.pixelSize: host.t.fsText; wrapMode: Text.Wrap }
+        Row {
+          anchors.right: parent.right
+          spacing: host.t.sp(10)
+          Btn { label: host.app.tr("Cancel", "Cancelar"); onClicked: host.hide() }
+          Btn { label: cfr.spec.ok; primary: true; danger: !!cfr.spec.danger; onClicked: { var f = cfr.spec.run; host.hide(); f() } }
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ delete messages
+  Component {
+    id: deleteC
+    DFrame {
+      id: df
+      readonly property var msgs: host.args.msgs || []
+      // For everyone: only yours, sent less than about two days ago, not deleted yet.
+      readonly property bool everyone: msgs.length > 0 && msgs.every(function(m) { return m.from_me && m.kind !== "revoked" && Date.now() / 1000 - m.ts < 60 * 60 * 48 && m.status >= 0 })
+      title: msgs.length > 1 ? host.app.tr("Delete " + msgs.length + " messages?", "Apagar " + msgs.length + " mensagens?") : host.app.tr("Delete message?", "Apagar mensagem?")
+      cardWidth: host.t.sp(440)
+      Column {
+        width: parent.width
+        spacing: host.t.sp(10)
+        topPadding: host.t.sp(6)
+        function done() { var d = host.args.done; host.hide(); if (d) d() }
+        Btn {
+          visible: df.everyone
+          anchors.right: parent.right
+          label: host.app.tr("Delete for everyone", "Apagar para todos")
+          onClicked: { host.wa.deleteMsgs(host.args.chat, df.msgs.map(function(m) { return m.id }), true); parent.done() }
+        }
+        Btn {
+          anchors.right: parent.right
+          label: host.app.tr("Delete for me", "Apagar para mim")
+          onClicked: { host.wa.deleteMsgs(host.args.chat, df.msgs.map(function(m) { return m.id }), false); parent.done() }
+        }
+        Btn {
+          anchors.right: parent.right
+          label: host.app.tr("Cancel", "Cancelar")
+          onClicked: host.hide()
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ forward
+  Component {
+    id: forwardC
+    DFrame {
+      id: ff
+      title: host.app.tr("Forward message to", "Encaminhar mensagem para")
+      cardWidth: host.t.sp(480)
+      property var picked: ({})
+      property int pickedRev: 0
+      readonly property var pickedList: { ff.pickedRev; return Object.keys(ff.picked) }
+      Component.onCompleted: host.wa.loadChatSubs()
+      readonly property var options: {
+        var q = U.fold(search.text.trim())
+        return host.wa.chatList.filter(function(c) { return !c.ro && (!q || U.fold(host.wa.chatName(c)).indexOf(q) >= 0) }).slice(0, 200)
+      }
+      Column {
+        width: parent.width
+        spacing: host.t.sp(10)
+        SearchPill { id: search; app: host.app; width: parent.width; placeholder: host.app.tr("Search name or number", "Pesquisar nome ou número"); Component.onCompleted: focusInput() }
+        ListView {
+          width: parent.width + host.t.sp(24)
+          x: -host.t.sp(12)
+          height: Math.min(host.height * 0.5, host.t.sp(420))
+          clip: true
+          model: ff.options
+          ScrollBar.vertical: ThinScroll { app: host.app }
+          delegate: PersonRow {
+            required property var modelData
+            app: host.app
+            jid: modelData.jid
+            name: host.wa.chatName(modelData)
+            group: modelData.kind === "group"
+            sub: host.wa.chatSubs[modelData.jid] ? String(host.wa.chatSubs[modelData.jid]).replace("\u0000you", host.app.tr("You", "Você")) : ""
+            checkable: true
+            checked: { ff.pickedRev; return !!ff.picked[modelData.jid] }
+            onClicked: { var p = ff.picked; if (p[modelData.jid]) delete p[modelData.jid]; else p[modelData.jid] = true; ff.pickedRev++ }
+          }
+        }
+        Item {
+          width: parent.width
+          height: host.t.sp(44)
+          Text {
+            anchors.left: parent.left
+            anchors.right: sendFwd.left
+            anchors.verticalCenter: parent.verticalCenter
+            elide: Text.ElideRight
+            text: ff.pickedList.map(function(j) { return host.wa.nameOf(j) }).join(", ")
+            color: host.t.dim
+            font.family: host.t.font
+            font.pixelSize: host.t.fsSmall + 1
+          }
+          Rectangle {
+            id: sendFwd
+            anchors.right: parent.right
+            width: host.t.sp(48); height: width; radius: width / 2
+            color: host.t.accent
+            opacity: ff.pickedList.length ? 1 : 0.4
+            Icon { anchors.centerIn: parent; name: "send"; size: host.t.sp(24); color: host.t.onBrand }
+            MouseArea {
+              anchors.fill: parent
+              enabled: ff.pickedList.length > 0
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                host.wa.forward(host.args.chat, (host.args.msgs || []).map(function(m) { return m.id }), ff.pickedList)
+                var d = host.args.done
+                host.hide()
+                if (d) d()
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ send files
+  Component {
+    id: filesC
+    DFrame {
+      id: sf
+      readonly property var files: host.args.files || []
+      property int at: 0
+      readonly property string currentPath: files[at] || ""
+      readonly property string kindOf: host.args.asDocument ? "document" : host.args.asAudio ? "audio" : U.kindOf(currentPath)
+      title: sf.files.length > 1 ? host.app.tr(sf.files.length + " files", sf.files.length + " arquivos") : U.basename(sf.currentPath)
+      cardWidth: host.t.sp(620)
+      function send() {
+        var caption = cap.text.trim()
+        for (var i = 0; i < sf.files.length; i++) {
+          var p = sf.files[i]
+          var kind = host.args.asDocument ? "document" : host.args.asAudio ? "audio" : U.kindOf(p)
+          host.wa.sendFile(host.args.chat, p, kind, i === sf.files.length - 1 ? caption : "", i === 0 ? (host.args.reply || "") : "", !!host.args.temp)
+        }
+        host.hide()
+      }
+      Column {
+        width: parent.width
+        spacing: host.t.sp(14)
+        Rectangle {
+          width: parent.width
+          height: Math.min(host.height * 0.5, host.t.sp(380))
+          radius: host.t.sp(10)
+          color: host.t.alpha(host.t.fg, 0.05)
+          Image {
+            anchors.fill: parent
+            anchors.margins: host.t.sp(8)
+            visible: sf.kindOf === "image"
+            source: sf.kindOf === "image" ? U.fileUrl(sf.currentPath) : ""
+            sourceSize.width: 1200
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+          }
+          Column {
+            anchors.centerIn: parent
+            visible: sf.kindOf !== "image"
+            spacing: host.t.sp(12)
+            Icon { anchors.horizontalCenter: parent.horizontalCenter; name: sf.kindOf === "video" ? "videoFilled" : sf.kindOf === "audio" ? "headphones" : "documentFilled"; size: host.t.sp(72); color: host.t.faint }
+            Text { anchors.horizontalCenter: parent.horizontalCenter; text: U.basename(sf.currentPath); color: host.t.text; font.family: host.t.font; font.pixelSize: host.t.fsText }
+            Text { anchors.horizontalCenter: parent.horizontalCenter; text: sf.kindOf === "document" ? host.app.tr("Sent as a document", "Enviado como documento") : ""; color: host.t.dim; font.family: host.t.font; font.pixelSize: host.t.fsSmall }
+          }
+        }
+        // The files, when there are several.
+        ListView {
+          visible: sf.files.length > 1
+          width: parent.width
+          height: visible ? host.t.sp(58) : 0
+          orientation: ListView.Horizontal
+          spacing: host.t.sp(8)
+          clip: true
+          model: sf.files
+          delegate: Rectangle {
+            required property var modelData
+            required property int index
+            width: host.t.sp(56); height: width; radius: host.t.sp(8)
+            color: host.t.hover
+            border.width: index === sf.at ? 2 : 0
+            border.color: host.t.accent
+            Image { anchors.fill: parent; anchors.margins: 3; visible: U.kindOf(modelData) === "image"; source: U.kindOf(modelData) === "image" ? U.fileUrl(modelData) : ""; sourceSize.width: 120; fillMode: Image.PreserveAspectCrop; asynchronous: true }
+            Icon { anchors.centerIn: parent; visible: U.kindOf(modelData) !== "image"; name: "documentFilled"; size: host.t.sp(26); color: host.t.faint }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: sf.at = index }
+          }
+        }
+        Row {
+          width: parent.width
+          spacing: host.t.sp(12)
+          Rectangle {
+            width: parent.width - host.t.sp(60)
+            height: host.t.sp(46)
+            radius: height / 2
+            color: host.t.field
+            visible: sf.kindOf !== "audio"
+            TextInput {
+              id: cap
+              anchors.fill: parent
+              anchors.leftMargin: host.t.sp(18)
+              anchors.rightMargin: host.t.sp(18)
+              verticalAlignment: TextInput.AlignVCenter
+              color: host.t.text
+              font.family: host.t.font
+              font.pixelSize: host.t.fsText
+              clip: true
+              Component.onCompleted: forceActiveFocus()
+              Keys.onReturnPressed: sf.send()
+              Text { anchors.fill: parent; verticalAlignment: Text.AlignVCenter; visible: !cap.text; text: host.app.tr("Add a caption", "Adicione uma legenda"); color: host.t.faint; font: cap.font }
+            }
+          }
+          Rectangle {
+            width: host.t.sp(48); height: width; radius: width / 2
+            color: host.t.accent
+            Icon { anchors.centerIn: parent; name: "send"; size: host.t.sp(24); color: host.t.onBrand }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: sf.send() }
+          }
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ reactions
+  Component {
+    id: reactionsC
+    DFrame {
+      id: rf
+      readonly property var m: host.args.msg
+      readonly property var latest: { var x = host.wa.findMsg(m.chat, m.id); return x || m }
+      property string only: ""
+      title: host.app.tr("Reactions", "Reações")
+      cardWidth: host.t.sp(400)
+      readonly property var people: {
+        var out = []
+        ;(rf.latest.reactions || []).forEach(function(r) {
+          if (rf.only && r.emoji !== rf.only) return
+          ;(r.by || []).forEach(function(p) { out.push({ jid: p.jid, name: p.name, emoji: r.emoji, mine: r.mine && p.name === "" }) })
+        })
+        return out
+      }
+      Column {
+        width: parent.width
+        spacing: host.t.sp(8)
+        Row {
+          spacing: host.t.sp(6)
+          Chip { app: host.app; label: host.app.tr("All", "Todas"); count: (rf.latest.reactions || []).reduce(function(s, r) { return s + r.count }, 0); on: rf.only === ""; onClicked: rf.only = "" }
+          Repeater {
+            model: rf.latest.reactions || []
+            delegate: Chip { required property var modelData; app: host.app; label: modelData.emoji; count: modelData.count; on: rf.only === modelData.emoji; onClicked: rf.only = modelData.emoji }
+          }
+        }
+        ListView {
+          width: parent.width + host.t.sp(24)
+          x: -host.t.sp(12)
+          height: Math.min(contentHeight, host.t.sp(360))
+          clip: true
+          model: rf.people
+          delegate: PersonRow {
+            required property var modelData
+            app: host.app
+            jid: modelData.name === "" ? (host.wa.me ? host.wa.me.jid : "") : modelData.jid
+            name: modelData.name === "" ? host.app.tr("You", "Você") : String(modelData.name).replace(/^~/, "")
+            sub: modelData.name === "" ? host.app.tr("Click to remove", "Clique para remover") : ""
+            badge: modelData.emoji
+            onClicked: if (modelData.name === "") { host.wa.react(rf.m, ""); host.hide() }
+          }
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ emoji
+  Component {
+    id: emojiC
+    Rectangle {
+      width: Math.min(host.t.sp(420), host.width - host.t.sp(40))
+      height: Math.min(host.t.sp(440), host.height - host.t.sp(40))
+      radius: host.t.sp(16)
+      color: host.t.panel
+      border.width: 1
+      border.color: host.t.line
+      clip: true
+      MouseArea { anchors.fill: parent }
+      EmojiPanel {
+        anchors.fill: parent
+        anchors.margins: 2
+        app: host.app
+        pickOnly: true
+        onPicked: glyph => { var f = host.args.onPick; host.hide(); if (f) f(glyph) }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ shortcuts
+  Component {
+    id: shortcutsC
+    DFrame {
+      id: scf
+      title: host.app.tr("Keyboard shortcuts", "Atalhos do teclado")
+      cardWidth: host.t.sp(640)
+      readonly property var keys: [
+        ["Ctrl+Alt+N · Ctrl+N", host.app.tr("New chat", "Nova conversa")],
+        ["Ctrl+Alt+/ · Ctrl+K", host.app.tr("Search", "Pesquisar")],
+        ["Ctrl+Alt+Shift+F", host.app.tr("Search in chat", "Pesquisar na conversa")],
+        ["Alt+↑ · Alt+↓", host.app.tr("Previous / next chat", "Conversa anterior / próxima")],
+        ["Ctrl+Alt+E", host.app.tr("Archive chat", "Arquivar conversa")],
+        ["Ctrl+Alt+Shift+M", host.app.tr("Mute chat", "Silenciar conversa")],
+        ["Ctrl+Alt+Shift+U", host.app.tr("Mark as unread", "Marcar como não lida")],
+        ["Ctrl+Alt+Shift+P", host.app.tr("Pin chat", "Fixar conversa")],
+        ["Ctrl+Alt+Backspace", host.app.tr("Delete chat", "Apagar conversa")],
+        ["Ctrl+Alt+I", host.app.tr("Contact info", "Dados do contato")],
+        ["Ctrl+Alt+P", host.app.tr("Profile", "Perfil")],
+        ["Ctrl+Alt+,", host.app.tr("Settings", "Configurações")],
+        ["↑ " + host.app.tr("(empty box)", "(caixa vazia)"), host.app.tr("Edit your last message", "Editar sua última mensagem")],
+        ["Ctrl+B · Ctrl+I", host.app.tr("Bold / italic", "Negrito / itálico")],
+        ["Ctrl+Shift+X", host.app.tr("Strikethrough", "Tachado")],
+        ["Ctrl+Shift+M", host.app.tr("Monospace", "Monoespaçado")],
+        ["Ctrl+V", host.app.tr("Paste a picture or files", "Colar imagem ou arquivos")],
+        ["Ctrl+= · Ctrl+-", host.app.tr("Zoom in / out", "Aumentar / diminuir zoom")],
+        ["Esc", host.app.tr("Close the chat, cancel", "Fechar a conversa, cancelar")],
+        ["Ctrl+W", host.app.tr("Hide the window", "Esconder a janela")]
+      ]
+      Grid {
+        width: parent.width
+        columns: 2
+        columnSpacing: host.t.sp(20)
+        rowSpacing: host.t.sp(10)
+        Repeater {
+          model: scf.keys
+          delegate: Row {
+            required property var modelData
+            width: (parent.width - host.t.sp(20)) / 2
+            spacing: host.t.sp(10)
+            Text { width: parent.width * 0.55; text: modelData[1]; color: host.t.text; font.family: host.t.font; font.pixelSize: host.t.fsSmall + 1; wrapMode: Text.Wrap }
+            Rectangle {
+              width: kt.implicitWidth + host.t.sp(12); height: kt.implicitHeight + host.t.sp(6); radius: host.t.sp(5)
+              color: host.t.hover
+              border.width: 1
+              border.color: host.t.line
+              Text { id: kt; anchors.centerIn: parent; text: modelData[0]; color: host.t.dim; font.family: host.t.font; font.pixelSize: host.t.fsSmall }
+            }
+          }
+        }
+      }
+    }
+  }
+}

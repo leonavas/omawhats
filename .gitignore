@@ -1,0 +1,4 @@
+bridge/whatsapp-claude-bridge*
+*.log
+*.db
+*.db-*

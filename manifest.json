@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "id": "leonavas.whatsapp-claude",
+  "name": "WhatsApp (Claude)",
+  "version": "0.1.0",
+  "author": "leonavas",
+  "license": "Apache-2.0",
+  "description": "A whole WhatsApp client inside the Omarchy shell, written by Claude: WhatsApp Web's layout drawn in the theme's colors, linked to your phone as one more device (a small Go bridge on whatsmeow, built on first run through mise). The bar icon opens it and badges what's waiting.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "WhatsApp (Claude)",
+    "description": "Claude's WhatsApp: click to open or hide the window, a red badge for unread direct chats and a blue one for groups, a preview of them on hover.",
+    "category": "Status",
+    "aliases": ["whatsapp", "zap", "chat", "claude", "messages"],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "iconStyle": "Mono",
+      "glyph": "󰖣",
+      "badge": "Count",
+      "badgeLayout": "Split",
+      "directColor": "#b65f4e",
+      "groupColor": "#467996",
+      "hideMode": "Special workspace",
+      "specialWorkspace": "scratchpad",
+      "openInSpecial": true,
+      "autoStart": false,
+      "launchForeground": true,
+      "hoverPreview": true,
+      "previewRows": 6,
+      "previewMessages": 3,
+      "mutedIndicator": "Bell"
+    },
+    "schema": [
+      { "key": "iconStyle", "type": "enum", "label": "Icon", "options": ["Mono", "Color", "Glyph"], "defaultValue": "Mono",
+        "description": "Mono draws the white WhatsApp mark tinted like the bar's glyphs, Color the green mark, Glyph any Nerd Font character." },
+      { "key": "glyph", "type": "string", "label": "Glyph", "defaultValue": "󰖣", "description": "Only used by the Glyph style." },
+      { "key": "badge", "type": "enum", "label": "Unread badge", "options": ["Count", "Dot", "None"], "defaultValue": "Count",
+        "description": "Unread direct chats at the bottom-right in red, groups at the top-right in blue. Muted and archived chats count in neither." },
+      { "key": "badgeLayout", "type": "enum", "label": "Badge layout", "options": ["Split", "Combined"], "defaultValue": "Split",
+        "description": "Combined shows one badge with their sum: red while a direct chat waits, blue when only groups do." },
+      { "key": "directColor", "type": "string", "label": "Direct chat badge color", "defaultValue": "#b65f4e" },
+      { "key": "groupColor", "type": "string", "label": "Group badge color", "defaultValue": "#467996" },
+      { "key": "hideMode", "type": "enum", "label": "What a click on the open window does", "options": ["Special workspace", "Never hide"], "defaultValue": "Special workspace" },
+      { "key": "specialWorkspace", "type": "string", "label": "Name of the special workspace", "defaultValue": "scratchpad" },
+      { "key": "openInSpecial", "type": "boolean", "label": "Open straight into the special workspace", "defaultValue": true },
+      { "key": "autoStart", "type": "boolean", "label": "Open the window when the shell starts", "defaultValue": false },
+      { "key": "launchForeground", "type": "boolean", "label": "Show and focus the window when it opens", "defaultValue": true },
+      { "key": "hoverPreview", "type": "boolean", "label": "Preview unread chats on hover", "defaultValue": true },
+      { "key": "previewRows", "type": "integer", "label": "Chats shown in the preview", "min": 1, "max": 20, "step": 1, "defaultValue": 6 },
+      { "key": "previewMessages", "type": "integer", "label": "Messages shown per chat", "min": 1, "max": 5, "step": 1, "defaultValue": 3 },
+      { "key": "mutedIndicator", "type": "enum", "label": "While notifications are paused", "options": ["Bell", "Dim", "None"], "defaultValue": "Bell" }
+    ]
+  }
+}
