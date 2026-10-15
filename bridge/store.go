@@ -184,11 +184,19 @@ func (b *Bridge) contact(j types.JID) types.ContactInfo {
 
 func (b *Bridge) contactName(j types.JID) string { return savedName(b.contact(j)) }
 
+// mine says a JID is this account's, by its number or its LID.
+func (b *Bridge) mine(j types.JID) bool {
+	if j.IsEmpty() {
+		return false
+	}
+	return j.User == b.me().User || (b.stored() && j.User == b.cli.Store.GetLID().User)
+}
+
 // senderName is who wrote a message, as a group shows them: "" for you,
 // the saved name or the business's, "~push name" for people you haven't
 // saved, else the number (with its +).
 func (b *Bridge) senderName(j types.JID, push string) string {
-	if j.User == b.me().User || (b.stored() && j.User == b.cli.Store.GetLID().User) {
+	if b.mine(j) {
 		return ""
 	}
 	c := b.contact(j)
@@ -521,7 +529,9 @@ func (b *Bridge) unread(chat string, limit int) {
 	b.db.QueryRow(`SELECT unread FROM chats WHERE jid = ?`, chat).Scan(&n)
 	ms := []Msg{}
 	if n = min(n, limit); n > 0 {
-		ms = b.query(`WHERE chat = ? AND from_me = 0 ORDER BY ts DESC LIMIT ?`, chat, n)
+		// Of the calls, only a missed one is unread.
+		ms = b.query(`WHERE chat = ? AND from_me = 0 AND NOT (messages.kind = 'call' AND instr(x, '"outcome":"missed"') = 0)
+			ORDER BY ts DESC LIMIT ?`, chat, n)
 		for i, j := 0, len(ms)-1; i < j; i, j = i+1, j-1 {
 			ms[i], ms[j] = ms[j], ms[i]
 		}

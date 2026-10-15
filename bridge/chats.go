@@ -274,6 +274,13 @@ func (b *Bridge) appStateEvent(raw any) {
 		b.setMeta("unarchive", on)
 		return
 	case *events.AppState:
+		// A call of the phone's log, as it ends (or as the log is read in full).
+		if len(e.Index) > 0 && e.Index[0] == appstate.IndexCallLog {
+			if m := b.callRecord(e.GetCallLogAction().GetCallLogRecord()); m != nil {
+				emit(map[string]any{"t": "message", "msg": m})
+			}
+			return
+		}
 		if len(e.Index) > 1 && e.Index[0] == appstate.IndexFavoriteSticker {
 			b.favSticker(e.Index[1], e.GetStickerAction())
 			return

@@ -150,7 +150,7 @@ Item {
       readonly property bool mine: !!row.last && row.last.from_me && !showTyping && !showDraft
 
       Ticks {
-        visible: preview.mine && row.last.kind !== "revoked" && row.last.kind !== "system"
+        visible: preview.mine && row.last.kind !== "revoked" && row.last.kind !== "system" && row.last.kind !== "call"
         status: row.last ? row.last.status : 0
         app: row.app
         anchors.verticalCenter: parent.verticalCenter

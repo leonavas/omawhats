@@ -113,7 +113,7 @@ func (b *Bridge) markRead(chat string, quiet, patch bool) {
 			logf("mark read %s: %v", chat, err)
 		}
 	}
-	ms := b.query(`WHERE chat = ? AND from_me = 0 AND messages.kind NOT IN ('system', 'placeholder') ORDER BY ts DESC LIMIT ?`, chat, min(max(unread, 1), 50))
+	ms := b.query(`WHERE chat = ? AND from_me = 0 AND messages.kind NOT IN ('system', 'placeholder', 'call') ORDER BY ts DESC LIMIT ?`, chat, min(max(unread, 1), 50))
 	bySender := map[string][]types.MessageID{}
 	waSender := map[string]string{}
 	for _, m := range ms {

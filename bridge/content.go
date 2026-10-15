@@ -113,10 +113,7 @@ func contentOf(m *waE2E.Message) (Content, bool) {
 			"group": x.GetGroupName(), "jid": x.GetGroupJID(), "code": x.GetInviteCode(),
 		}}}, true
 	case m.GetCallLogMesssage() != nil:
-		x := m.GetCallLogMesssage()
-		return Content{Kind: "call", X: map[string]any{"call": map[string]any{
-			"video": x.GetIsVideo(), "outcome": strings.ToLower(x.GetCallOutcome().String()), "secs": x.GetDurationSecs(),
-		}}}, true
+		return Content{Kind: "call", X: map[string]any{"call": callContent(m.GetCallLogMesssage())}}, true
 	case m.GetPinInChatMessage() != nil:
 		pin := m.GetPinInChatMessage().GetType() == waE2E.PinInChatMessage_PIN_FOR_ALL
 		return Content{Kind: "system", X: map[string]any{"sys": map[string]any{"type": map[bool]string{true: "pin", false: "unpin"}[pin]}}}, true
@@ -247,10 +244,11 @@ func stubOf(web *waWeb.WebMessageInfo) (Content, []string, bool) {
 		kind = "ephemeral"
 	case waWeb.WebMessageInfo_E2E_IDENTITY_CHANGED:
 		kind = "security_code"
-	case waWeb.WebMessageInfo_CALL_MISSED_VOICE, waWeb.WebMessageInfo_CALL_MISSED_GROUP_VOICE:
-		return Content{Kind: "call", X: map[string]any{"call": map[string]any{"video": false, "outcome": "missed"}}}, nil, true
-	case waWeb.WebMessageInfo_CALL_MISSED_VIDEO, waWeb.WebMessageInfo_CALL_MISSED_GROUP_VIDEO:
-		return Content{Kind: "call", X: map[string]any{"call": map[string]any{"video": true, "outcome": "missed"}}}, nil, true
+	case waWeb.WebMessageInfo_CALL_MISSED_VOICE, waWeb.WebMessageInfo_CALL_MISSED_VIDEO, waWeb.WebMessageInfo_CALL_MISSED_GROUP_VOICE, waWeb.WebMessageInfo_CALL_MISSED_GROUP_VIDEO:
+		t := web.GetMessageStubType()
+		return Content{Kind: "call", X: map[string]any{"call": Call{Outcome: "missed", Phone: true,
+			Video: t == waWeb.WebMessageInfo_CALL_MISSED_VIDEO || t == waWeb.WebMessageInfo_CALL_MISSED_GROUP_VIDEO,
+			Group: t == waWeb.WebMessageInfo_CALL_MISSED_GROUP_VOICE || t == waWeb.WebMessageInfo_CALL_MISSED_GROUP_VIDEO}}}, nil, true
 	case waWeb.WebMessageInfo_REVOKE:
 		return Content{Kind: "revoked"}, nil, true
 	case waWeb.WebMessageInfo_CIPHERTEXT:
