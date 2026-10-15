@@ -159,6 +159,10 @@ Item {
       box.wa.sendText(box.chat, box.withMentions(text), box.replyTo ? box.replyTo.id : "")
       box.view.replyTo = null
     }
+    box.clear()
+  }
+  // The box empty again, its draft too.
+  function clear() {
     box._loading = true
     input.text = ""
     box._loading = false
@@ -167,6 +171,18 @@ Item {
     box.app.setDraft(box.chat, "")
     pausedSoon.stop()
     if (box._lastTyping) { box.wa.typingState(box.chat, "paused"); box._lastTyping = 0 }
+  }
+
+  // The preview of files to send, as WhatsApp Web's: what you'd begun to
+  // type goes along as their caption, and leaves the box once they're sent.
+  function preview(args) {
+    var text = box.editing ? "" : input.text
+    args.chat = box.chat
+    args.reply = box.replyTo ? box.replyTo.id : ""
+    args.caption = text
+    if (text.trim()) args.onSent = function() { box.clear() }
+    box.win.dialog("sendFiles", args)
+    if (box.view) box.view.replyTo = null
   }
 
   // Your last message, to edit with ↑ in an empty box.
@@ -193,12 +209,10 @@ Item {
 
   function paste() {
     box.app.readClipboard(function(r) {
-      // A picture (a screenshot, say) goes to the preview, its caption and
-      // the reply with it, as one attached or dropped does.
-      if (r.image || (r.files && r.files.length)) {
-        box.win.dialog("sendFiles", { chat: box.chat, files: r.image ? [r.image] : r.files, temp: !!r.image, reply: box.replyTo ? box.replyTo.id : "" })
-        if (box.view) box.view.replyTo = null
-      } else if (r.text) box.insert(r.text)
+      // A picture (a screenshot, say) goes to the preview, as one attached
+      // does.
+      if (r.image || (r.files && r.files.length)) box.preview({ files: r.image ? [r.image] : r.files, temp: !!r.image })
+      else if (r.text) box.insert(r.text)
     })
   }
 
@@ -208,8 +222,7 @@ Item {
                : kind === "audio" ? tr("Audio", "Áudio") + " (*.mp3 *.m4a *.ogg *.opus *.aac *.wav *.flac *.amr)" : ""
     box.win.pickFiles(kind === "document" ? tr("Send documents", "Enviar documentos") : kind === "audio" ? tr("Send audio", "Enviar áudio") : tr("Send photos and videos", "Enviar fotos e vídeos"),
                       filter, function(files) {
-      box.win.dialog("sendFiles", { chat: box.chat, files: files, asDocument: kind === "document", asAudio: kind === "audio", reply: box.replyTo ? box.replyTo.id : "" })
-      if (box.view) box.view.replyTo = null
+      box.preview({ files: files, asDocument: kind === "document", asAudio: kind === "audio" })
     })
   }
 

@@ -287,6 +287,7 @@ Item {
           var kind = host.args.asDocument ? "document" : host.args.asAudio ? "audio" : U.kindOf(p)
           host.wa.sendFile(host.args.chat, p, kind, i === sf.files.length - 1 ? caption : "", i === 0 ? (host.args.reply || "") : "", !!sf.temps[p])
         }
+        if (host.args.onSent) host.args.onSent()
         host.hide()
       }
       function paste() {
@@ -386,7 +387,8 @@ Item {
                 selectByMouse: true
                 selectionColor: host.t.alpha(host.t.accent, 0.4)
                 onCursorRectangleChanged: capScroll.ensureVisible(cursorRectangle)
-                Component.onCompleted: forceActiveFocus()
+                // What you'd begun to type in the message box, the cursor at its end.
+                Component.onCompleted: { cap.text = host.args.caption || ""; cap.cursorPosition = cap.length; forceActiveFocus() }
                 Keys.onPressed: event => {
                   var ctrl = event.modifiers & Qt.ControlModifier, shift = event.modifiers & Qt.ShiftModifier
                   if ((ctrl && event.key === Qt.Key_V) || event.matches(StandardKey.Paste)) { sf.paste(); event.accepted = true; return }
