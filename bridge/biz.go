@@ -217,6 +217,10 @@ func (b *Bridge) askBizNames() {
 			b.setVerified(j.String(), vn)
 			if vn != nil {
 				b.setBizName(j.String(), vn.Details.GetVerifiedName())
+			} else if c := b.contact(j); c.FullName == "" && c.FirstName == "" && c.BusinessName != "" {
+				// A business without a verified name (one on the Cloud API,
+				// say) only has the name the answer left in the contacts.
+				b.setBizName(j.String(), c.BusinessName)
 			}
 		}
 	}
