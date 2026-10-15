@@ -213,9 +213,20 @@ func (b *Bridge) message(e *events.Message, status int) *Msg {
 	b.db.Exec(`INSERT INTO chats (jid, last_ts, wa_jid) VALUES (?, ?, ?)
 		ON CONFLICT (jid) DO UPDATE SET last_ts = max(last_ts, excluded.last_ts),
 			wa_jid = CASE WHEN wa_jid = '' THEN excluded.wa_jid ELSE wa_jid END, cleared = 0`, m.Chat, m.TS, e.Info.Chat.ToNonAD().String())
-	// A business's level comes with each of its messages: "high" gets the check.
-	if vn := e.Info.VerifiedName; vn != nil && vn.VerifiedLevel != "" && !e.Info.IsGroup && !e.Info.IsFromMe {
-		b.db.Exec(`UPDATE chats SET verified = ? WHERE jid = ?`, vn.VerifiedLevel, m.Chat)
+	// A business's level and name come with each of its messages: "high"
+	// gets the check, the name stands in for the number.
+	if vn := e.Info.VerifiedName; vn != nil && !e.Info.IsGroup && !e.Info.IsFromMe {
+		if vn.VerifiedLevel != "" {
+			b.db.Exec(`UPDATE chats SET verified = ? WHERE jid = ?`, vn.VerifiedLevel, m.Chat)
+		}
+		b.setBizName(m.Chat, vn.Details.GetVerifiedName())
+	}
+	// Someone with no name here, never asked: maybe a business (bizNames).
+	if chat.Server == types.DefaultUserServer && !e.Info.IsGroup {
+		var level string
+		if b.db.QueryRow(`SELECT verified FROM chats WHERE jid = ?`, m.Chat).Scan(&level) == nil && level == "" && b.contactName(chat) == "" {
+			b.wantBizNames()
+		}
 	}
 	if !viewOnce {
 		if md, part := mediaOf(e.Message); md != nil {
@@ -452,7 +463,11 @@ func (b *Bridge) historyMessage(jid, chat types.JID, web *waWeb.WebMessageInfo) 
 	}
 	// A business's verified name, as WhatsApp Web shows it in place of
 	// the number; live messages get it from whatsmeow itself.
-	if biz := web.GetVerifiedBizName(); biz != "" && !evt.Info.IsFromMe && !evt.Info.IsGroup && b.stored() {
+	biz := web.GetVerifiedBizName()
+	if evt.Info.IsFromMe || evt.Info.IsGroup {
+		biz = ""
+	}
+	if biz != "" && b.stored() {
 		b.cli.Store.Contacts.PutBusinessName(b.ctx, b.norm(evt.Info.Sender), biz)
 	}
 	// WebMessageInfo: 2 server ack, 3 delivered, 4 read, 5 played.
@@ -466,6 +481,8 @@ func (b *Bridge) historyMessage(jid, chat types.JID, web *waWeb.WebMessageInfo) 
 		status = 2
 	}
 	b.message(evt, status)
+	// On its chat too, now that the row is there.
+	b.setBizName(chat.String(), biz)
 	for _, r := range web.GetReactions() {
 		b.react(chat.String(), web.GetKey().GetID(), b.reactionSender(chat, r.GetKey()), r.GetText(), r.GetSenderTimestampMS()/1000)
 	}

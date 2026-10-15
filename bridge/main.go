@@ -214,6 +214,8 @@ type Bridge struct {
 	avatars chan avatarReq
 	// Chat actions, one at a time and in order: a pin and its undo can't swap.
 	actions chan Cmd
+	// A round of business names is due (bizNames).
+	bizDue chan struct{}
 	// The chats as last sent, by JID: only the ones that change go again.
 	sentMu sync.Mutex
 	sent   map[string]string
@@ -276,7 +278,7 @@ func main() {
 	migrate(db)
 
 	b := &Bridge{cli: whatsmeow.NewClient(device, newLog("wa", "INFO")), db: db, dir: dir,
-		avatars: make(chan avatarReq, 4096), actions: make(chan Cmd, 64), sent: map[string]string{}}
+		avatars: make(chan avatarReq, 4096), actions: make(chan Cmd, 64), bizDue: make(chan struct{}, 1), sent: map[string]string{}}
 	// whatsmeow's context logger, for the favorites' version (see favLog).
 	b.ctx = zerolog.New(favLog{b}).Level(zerolog.DebugLevel).WithContext(ctx)
 	b.cli.BackgroundEventCtx = b.ctx
@@ -293,6 +295,7 @@ func main() {
 	go b.flushChats()
 	go b.sweep()
 	go b.chatActions()
+	go b.bizNames()
 	for range 3 {
 		go b.fetchAvatars()
 	}
@@ -443,7 +446,7 @@ func (b *Bridge) handle(raw any) {
 		go b.syncGroups()
 		go b.resyncOnce()
 		go b.stickersOnce()
-		go b.bizNamesOnce()
+		b.wantBizNames()
 		select {
 		case b.avatars <- avatarReq{jid: b.me().String()}:
 		default:
