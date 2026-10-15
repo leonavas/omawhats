@@ -2,7 +2,7 @@ import QtQuick
 import "../lib/Registry.js" as Reg
 
 // The side panel: the chat list, or one of the views that slide over it
-// (archived, new chat, settings, your profile, starred messages), each
+// (archived, new chat, settings, starred messages), each
 // with WhatsApp Web's back arrow.
 Rectangle {
   id: side
@@ -39,13 +39,11 @@ Rectangle {
       sourceComponent: drawer.view === "archived" ? archivedC
                      : drawer.view === "newchat" ? newChatC
                      : drawer.view === "settings" ? settingsC
-                     : drawer.view === "profile" ? profileC
                      : drawer.view === "starred" ? starredC : null
     }
   }
   Component { id: archivedC; ChatsView { app: side.app; win: side.win; archived: true } }
   Component { id: newChatC; NewChatView { app: side.app; win: side.win } }
   Component { id: settingsC; SettingsView { app: side.app; win: side.win } }
-  Component { id: profileC; ProfileView { app: side.app; win: side.win } }
   Component { id: starredC; StarredView { app: side.app; win: side.win } }
 }

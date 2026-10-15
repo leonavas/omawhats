@@ -170,7 +170,7 @@ Item {
         size: r.t.sp(28)
         jid: mi.m.sender
         name: String(mi.m.name || "").replace(/^~/, "")
-        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: r.wa.open(mi.m.sender) }
+        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: r.win.showProfile(mi.m.sender) }
       }
 
       Bubble {

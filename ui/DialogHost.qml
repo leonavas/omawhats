@@ -9,7 +9,8 @@ import "../lib/Registry.js" as Reg
 // The dialogs, over a dimmed window, as WhatsApp Web's: confirmations
 // (log out, clear or delete a chat, delete messages), forwarding, the
 // preview of files before they're sent, who reacted, the emoji picker for
-// a reaction, and the keyboard shortcuts.
+// a reaction, the keyboard shortcuts, and from your menu (AccountMenu.qml)
+// your profile and About, as whatsapp-tui's.
 Item {
   id: host
   property var app: Reg.service
@@ -22,8 +23,12 @@ Item {
   visible: shown
   z: 800
 
+  // Closing (Close, a click outside, or opening something else from it)
+  // keeps what's being typed in the profile's name or about, as a click
+  // elsewhere in the card does; Esc in the field drops it.
+  signal commitEdits()
   function show(n, a) { host.args = a || {}; host.name = n; host.forceActiveFocus() }
-  function hide() { host.name = ""; host.args = ({}) }
+  function hide() { host.commitEdits(); host.name = ""; host.args = ({}) }
 
   Keys.onEscapePressed: host.hide()
 
@@ -39,13 +44,15 @@ Item {
     active: host.shown
     sourceComponent: {
       switch (host.name) {
-      case "logout": case "clearChat": case "deleteChat": return confirmC
+      case "logout": case "clearChat": case "deleteChat": case "removePhoto": return confirmC
       case "deleteMsgs": return deleteC
       case "forward": return forwardC
       case "sendFiles": return filesC
       case "reactions": return reactionsC
       case "emoji": return emojiC
       case "shortcuts": return shortcutsC
+      case "profile": return profileC
+      case "about": return aboutC
       }
       return null
     }
@@ -63,7 +70,7 @@ Item {
     color: host.t.popup
     border.width: 1
     border.color: host.t.line
-    MouseArea { anchors.fill: parent }
+    MouseArea { anchors.fill: parent; onPressed: host.commitEdits() }
     Text {
       visible: fr.title !== ""
       x: host.t.sp(24)
@@ -121,6 +128,8 @@ Item {
         var name = host.args.chat ? host.wa.nameOf(host.args.chat) : ""
         if (host.name === "logout") return { title: tr("Log out?", "Desconectar?"), text: tr("This computer stops being a linked device. Your chats stay on your phone.", "Este computador deixa de ser um aparelho conectado. Suas conversas continuam no celular."), ok: tr("Log out", "Desconectar"), danger: true,
                                              run: function() { host.wa.logout() } }
+        if (host.name === "removePhoto") return { title: tr("Remove your profile photo?", "Remover sua foto do perfil?"), text: tr("Everyone will see your initials in its place.", "Todos verão suas iniciais no lugar."), ok: tr("Remove", "Remover"), danger: true,
+                                                  run: function() { host.wa.setMyPhoto(""); host.show("profile") } }
         if (host.name === "clearChat") return { title: tr("Clear this chat?", "Limpar esta conversa?"), text: tr("Messages will only be removed from this device and your devices on the newer versions of WhatsApp.", "As mensagens serão removidas apenas deste aparelho e dos seus aparelhos com as versões mais recentes do WhatsApp."), ok: tr("Clear chat", "Limpar conversa"), danger: true,
                                                 run: function() { host.wa.chatAction(host.args.chat, "clear") } }
         return { title: tr("Delete this chat?", "Apagar esta conversa?"), text: tr("Messages will only be removed from this device and your devices on the newer versions of WhatsApp.", "As mensagens serão removidas apenas deste aparelho e dos seus aparelhos com as versões mais recentes do WhatsApp."), ok: tr("Delete chat", "Apagar conversa"), danger: true,
@@ -396,7 +405,7 @@ Item {
             name: modelData.name === "" ? host.app.tr("You", "Você") : String(modelData.name).replace(/^~/, "")
             sub: modelData.name === "" ? host.app.tr("Click to remove", "Clique para remover") : ""
             badge: modelData.emoji
-            onClicked: if (modelData.name === "") { host.wa.react(rf.m, ""); host.hide() }
+            onClicked: { if (modelData.name === "") host.wa.react(rf.m, ""); else host.win.showProfile(modelData.jid); host.hide() }
           }
         }
       }
@@ -425,6 +434,331 @@ Item {
     }
   }
 
+  // ------------------------------------------------------------ your profile
+  // whatsapp-tui's "Perfil": your photo, your name over your number, and
+  // your about. The name and the about edit in place, as on WhatsApp Web
+  // (the pencil, then ✓ or Enter to save, Esc to leave it); a click on the
+  // number copies it.
+  component EditLine: Item {
+    id: el
+    property string value: ""
+    property string display: value
+    property bool dimmed: false
+    property int limit: 25
+    property bool wrap: false
+    property bool editable: true
+    property int pixelSize: host.t.fsName
+    property int weight: Font.Normal
+    property color textColor: host.t.text
+    property bool editing: false
+    signal saved(string text)
+    height: editing ? box.height : shown.height
+    Connections { target: host; function onCommitEdits() { if (el.editing) el.save() } }
+
+    function start() {
+      if (!el.editable) return
+      host.commitEdits()
+      input.text = el.value
+      el.editing = true
+      input.forceActiveFocus()
+      input.cursorPosition = input.text.length
+    }
+    function cancel() { el.editing = false; host.forceActiveFocus() }
+    function save() {
+      var s = input.text.trim()
+      if (s === "") return
+      el.editing = false
+      host.forceActiveFocus()
+      if (s !== el.value) el.saved(s)
+    }
+
+    Item {
+      id: shown
+      visible: !el.editing
+      width: parent.width
+      height: Math.max(shownText.implicitHeight, host.t.sp(32))
+      Text {
+        id: shownText
+        width: parent.width - (pen.visible ? pen.width + host.t.sp(8) : 0)
+        anchors.verticalCenter: parent.verticalCenter
+        text: el.display
+        color: el.dimmed ? host.t.dim : el.textColor
+        font.family: host.t.font
+        font.pixelSize: el.pixelSize
+        font.weight: el.weight
+        wrapMode: el.wrap ? Text.Wrap : Text.NoWrap
+        elide: el.wrap ? Text.ElideNone : Text.ElideRight
+        textFormat: Text.PlainText
+      }
+      IconButton {
+        id: pen
+        visible: el.editable
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        implicitWidth: host.t.sp(32); implicitHeight: host.t.sp(32)
+        icon: "edit"
+        iconSize: host.t.sp(20)
+        tip: host.app.tr("Edit", "Editar")
+        onClicked: el.start()
+      }
+    }
+    Item {
+      id: box
+      visible: el.editing
+      width: parent.width
+      height: Math.max(input.contentHeight, host.t.sp(24)) + host.t.sp(12)
+      TextInput {
+        id: input
+        y: host.t.sp(4)
+        width: parent.width - count.width - ok.width - host.t.sp(12)
+        color: host.t.text
+        font.family: host.t.font
+        font.pixelSize: el.pixelSize
+        font.weight: el.weight
+        wrapMode: el.wrap ? TextInput.Wrap : TextInput.NoWrap
+        clip: !el.wrap
+        maximumLength: el.limit
+        selectByMouse: true
+        selectionColor: host.t.alpha(host.t.accent, 0.4)
+        selectedTextColor: host.t.textBright
+        Keys.onReturnPressed: event => { el.save(); event.accepted = true }
+        Keys.onEnterPressed: event => { el.save(); event.accepted = true }
+        Keys.onEscapePressed: event => { el.cancel(); event.accepted = true }
+      }
+      Text {
+        id: count
+        anchors.right: ok.left
+        anchors.rightMargin: host.t.sp(4)
+        y: input.y + Math.max(0, Math.round((host.t.sp(24) - height) / 2))
+        text: String(el.limit - input.length)
+        color: host.t.faint
+        font.family: host.t.font
+        font.pixelSize: host.t.fsSmall
+      }
+      IconButton {
+        id: ok
+        anchors.right: parent.right
+        y: input.y + Math.round((host.t.sp(24) - height) / 2)
+        implicitWidth: host.t.sp(32); implicitHeight: host.t.sp(32)
+        icon: "check"
+        iconSize: host.t.sp(20)
+        enabledState: input.text.trim() !== ""
+        tip: host.app.tr("Save", "Salvar")
+        onClicked: el.save()
+      }
+      Rectangle {
+        anchors.bottom: parent.bottom
+        width: parent.width
+        height: 2
+        color: host.t.accent
+      }
+    }
+  }
+
+  Component {
+    id: profileC
+    DFrame {
+      id: pf
+      readonly property string jid: host.wa.me ? host.wa.me.jid : ""
+      readonly property var info: pf.jid ? host.wa.profile(pf.jid) : null
+      readonly property string phone: host.wa.me ? U.phone(host.wa.me.phone) : ""
+      title: host.app.tr("Profile", "Perfil")
+      cardWidth: host.t.sp(460)
+      Component.onCompleted: if (pf.jid) host.wa.askProfile(pf.jid)
+      Column {
+        width: parent.width
+        spacing: host.t.sp(18)
+        Row {
+          width: parent.width
+          spacing: host.t.sp(16)
+          Avatar {
+            id: pfPhoto
+            app: host.app
+            size: host.t.sp(72)
+            jid: pf.jid
+            name: host.wa.me ? host.wa.me.name : ""
+            source: pf.info && pf.info.photo ? pf.info.photo : ""
+            // While a new one goes (or the old one leaves).
+            Rectangle {
+              anchors.fill: parent
+              radius: width / 2
+              visible: host.wa.photoBusy
+              color: host.t.alpha(host.t.bg, 0.6)
+              Text { anchors.centerIn: parent; text: "…"; color: host.t.textBright; font.family: host.t.font; font.pixelSize: host.t.fsName }
+            }
+            // WhatsApp Web's menu on your photo: see it, upload one, remove it.
+            MouseArea {
+              id: pfPhotoMa
+              anchors.fill: parent
+              enabled: !!host.wa.me && !host.wa.photoBusy
+              hoverEnabled: true
+              cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+              onClicked: {
+                var tr = host.app.tr, has = !!pf.info && !!pf.info.photo
+                var items = []
+                if (has) items.push({ label: tr("View photo", "Ver foto"), icon: "eye", action: function() {
+                  var p = pf.info.photo, n = host.wa.me ? host.wa.me.name : ""
+                  host.hide()
+                  host.win.viewMedia({ chat: pf.jid, id: "photo", kind: "image", media: { file: U.unfileUrl(p) }, ts: 0, name: n })
+                } })
+                items.push({ label: tr("Upload photo", "Carregar foto"), icon: "photo", action: function() {
+                  host.win.pickFiles(tr("Profile photo", "Foto do perfil"), tr("Images", "Imagens") + " (*.jpg *.jpeg *.png *.webp *.gif *.bmp *.heic *.avif)",
+                                     function(files) { if (files.length) host.wa.setMyPhoto(files[0]) }, true)
+                } })
+                if (has) items.push({ label: tr("Remove photo", "Remover foto"), icon: "delete", danger: true, action: function() { host.show("removePhoto") } })
+                host.win.menuAt(pfPhoto, items, pfPhoto.width / 2, pfPhoto.height / 2)
+              }
+            }
+            Tip { text: host.app.tr("Profile photo", "Foto do perfil"); shown: pfPhotoMa.containsMouse && pfPhotoMa.enabled; placement: "below" }
+          }
+          Column {
+            width: parent.width - pfPhoto.width - host.t.sp(16)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: host.t.sp(2)
+            // A business account's name is its business name, read-only
+            // as on WhatsApp Web Business (it changes on the phone).
+            Text {
+              visible: !!host.wa.me && !!host.wa.me.business
+              text: host.app.tr("Business name", "Nome comercial")
+              color: host.t.dim
+              font.family: host.t.font
+              font.pixelSize: host.t.fsSmall
+            }
+            EditLine {
+              width: parent.width
+              value: host.wa.me ? (host.wa.me.business && host.wa.me.businessName ? host.wa.me.businessName : host.wa.me.name || "") : ""
+              display: value || host.app.tr("You", "Você")
+              limit: 25
+              editable: !!host.wa.me && !host.wa.me.business
+              textColor: host.t.textBright
+              pixelSize: host.t.fsName + 2
+              weight: Font.DemiBold
+              onSaved: text => host.wa.setMyName(text)
+            }
+            Text {
+              id: pfPhone
+              text: pf.phone
+              color: phMa.containsMouse ? host.t.text : host.t.dim
+              font.family: host.t.font
+              font.pixelSize: host.t.fsText
+              font.underline: phMa.containsMouse
+              MouseArea {
+                id: phMa
+                anchors.fill: parent
+                hoverEnabled: true
+                enabled: pf.phone !== ""
+                cursorShape: Qt.PointingHandCursor
+                onClicked: { host.app.copy(pf.phone); host.win.toast(host.app.tr("Number copied", "Número copiado")) }
+              }
+              Tip { text: host.app.tr("Copy number", "Copiar número"); shown: phMa.containsMouse; placement: "below" }
+            }
+          }
+        }
+        Column {
+          width: parent.width
+          spacing: host.t.sp(6)
+          Text { text: host.app.tr("About", "Recado"); color: host.t.accent; font.family: host.t.font; font.pixelSize: host.t.fsText; font.weight: Font.Medium }
+          EditLine {
+            width: parent.width
+            value: pf.info && !pf.info.error ? (pf.info.about || "") : ""
+            display: !pf.info ? host.app.tr("Loading…", "Carregando…")
+                     : pf.info.error ? host.app.tr("Didn't load: ", "Não carregou: ") + pf.info.error
+                     : value.trim() !== "" ? value : "—"
+            dimmed: !pf.info || !!pf.info.error
+            limit: 139
+            wrap: true
+            editable: !!pf.info && !pf.info.error
+            onSaved: text => host.wa.setMyAbout(text)
+          }
+        }
+        Btn { anchors.right: parent.right; label: host.app.tr("Close", "Fechar"); primary: true; onClicked: host.hide() }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ about
+  // whatsapp-tui's "Sobre": the name, the version and where the code is,
+  // with a newer version when there is one (core/Updater.qml).
+  Component {
+    id: aboutC
+    DFrame {
+      id: ab
+      readonly property var up: host.app.updater || null
+      readonly property string repo: ab.up && ab.up.repo ? ab.up.repo : "https://github.com/leonavas/omawhats"
+      cardWidth: host.t.sp(440)
+      Column {
+        width: parent.width
+        spacing: host.t.sp(8)
+        Image {
+          anchors.horizontalCenter: parent.horizontalCenter
+          source: Qt.resolvedUrl("../assets/whatsapp.svg")
+          width: host.t.sp(56); height: width
+          sourceSize.width: width * 2; sourceSize.height: height * 2
+        }
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          text: host.app.windowTitleBase
+          color: host.t.accent
+          font.family: host.t.font
+          font.pixelSize: host.t.px(22)
+          font.weight: Font.Bold
+        }
+        Text {
+          visible: !!ab.up && !!ab.up.version
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          text: ab.up ? host.app.tr("version ", "versão ") + ab.up.version : ""
+          color: host.t.dim
+          font.family: host.t.font
+          font.pixelSize: host.t.fsSmall
+        }
+        Text {
+          readonly property bool busy: !!ab.up && ab.up.phase === "updating"
+          visible: !!ab.up && ab.up.phase !== ""
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          text: !ab.up ? "" : busy ? host.app.tr("Updating to ", "Atualizando para a versão ") + ab.up.latest + "…"
+                : ab.up.phase === "updated" ? host.app.tr("Version ", "Versão ") + ab.up.latest + host.app.tr(" is installed · restart the shell", " instalada · reiniciar o shell")
+                : host.app.tr("Version ", "Versão ") + ab.up.latest + host.app.tr(" is available · update", " disponível · atualizar")
+          color: busy ? host.t.dim : host.t.green
+          font.family: host.t.font
+          font.pixelSize: host.t.fsSmall
+          font.underline: !busy && abUp.containsMouse
+          MouseArea { id: abUp; anchors.fill: parent; hoverEnabled: true; enabled: !parent.busy; cursorShape: Qt.PointingHandCursor; onClicked: ab.up.update() }
+        }
+        Item { width: 1; height: host.t.sp(4) }
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          text: ab.repo.replace("https://", "")
+          color: host.t.link
+          font.family: host.t.font
+          font.pixelSize: host.t.fsText
+          font.underline: abLink.containsMouse
+          MouseArea { id: abLink; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Qt.openUrlExternally(ab.repo) }
+        }
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.Wrap
+          text: host.app.tr("An unofficial WhatsApp client for the Omarchy shell, linked to your phone as one more device. Not made or endorsed by WhatsApp.",
+                            "Um cliente não oficial do WhatsApp para o shell do Omarchy, conectado ao seu celular como mais um aparelho. Não é feito nem endossado pelo WhatsApp.")
+          color: host.t.dim
+          font.family: host.t.font
+          font.pixelSize: host.t.fsSmall
+        }
+        Item { width: 1; height: host.t.sp(8) }
+        Row {
+          anchors.right: parent.right
+          spacing: host.t.sp(10)
+          Btn { label: host.app.tr("Keyboard shortcuts", "Atalhos do teclado"); onClicked: host.show("shortcuts", {}) }
+          Btn { label: host.app.tr("Close", "Fechar"); primary: true; onClicked: host.hide() }
+        }
+      }
+    }
+  }
+
   // ------------------------------------------------------------ shortcuts
   Component {
     id: shortcutsC
@@ -443,8 +777,10 @@ Item {
         ["Ctrl+Alt+Shift+P", host.app.tr("Pin chat", "Fixar conversa")],
         ["Ctrl+Alt+Backspace", host.app.tr("Delete chat", "Apagar conversa")],
         ["Ctrl+Alt+I", host.app.tr("Contact info", "Dados do contato")],
+        ["Alt+S", host.app.tr("Your menu", "Menu da conta")],
         ["Ctrl+Alt+P", host.app.tr("Profile", "Perfil")],
         ["Ctrl+Alt+,", host.app.tr("Settings", "Configurações")],
+        ["Ctrl+/", host.app.tr("Keyboard shortcuts", "Atalhos do teclado")],
         ["↑ " + host.app.tr("(empty box)", "(caixa vazia)"), host.app.tr("Edit your last message", "Editar sua última mensagem")],
         ["Ctrl+B · Ctrl+I", host.app.tr("Bold / italic", "Negrito / itálico")],
         ["Ctrl+Shift+X", host.app.tr("Strikethrough", "Tachado")],

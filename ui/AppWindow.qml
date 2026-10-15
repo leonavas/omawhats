@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import Quickshell
+import Quickshell.Io
 import "../lib/Util.js" as U
 import "../lib/Registry.js" as Reg
 
@@ -15,11 +16,16 @@ FloatingWindow {
   readonly property var t: app.theme
   readonly property var wa: app.wa
 
-  // chats, archived, newchat, newgroup, settings, profile, starred
+  // chats, archived, newchat, newgroup, settings, starred
   property string sideView: "chats"
   property bool infoOpen: false
   property string infoView: ""     // "", media, starred
+  // Whose info the panel shows: "" for the open chat's, or a person's
+  // picked in it (a sender's name or picture, a mention, a reaction).
+  property string infoChat: ""
   property string searchChat: ""   // the chat whose messages are searched (the info side)
+  // Your menu (the photo at the foot of the rail, Alt+S), whatsapp-tui's.
+  property bool accountOpen: false
   readonly property bool menusShown: menus.shown
 
   title: (app.attention.chats > 0 ? "(" + app.attention.chats + ") " : "") + app.windowTitleBase
@@ -42,10 +48,36 @@ FloatingWindow {
   function closeDialog() { dialogs.hide() }
   function viewMedia(m) { viewer.msg = m; viewer.active = true }
   function toast(text) { toastBox.show(text) }
+  // Files picked in Omarchy's chooser (`omarchy-file-select`, the desktop
+  // portal's), in its own process: Qt's FileDialog runs GTK's inside the
+  // shell, and a GVfs hiccup there took the whole shell down.
+  // `cb([paths])`; filter: "Name (*.a *.b)"; single: one file.
+  function pickFiles(title, filter, cb, single) {
+    if (picker.running) return
+    var args = ["--title", title]
+    if (!single) args.push("--multiple")
+    var m = /\((.*)\)\s*$/.exec(filter || "")
+    if (m) args.push("--extensions", m[1].split(/\s+/).map(function(g) { return g.replace(/^\*\./, "") }).filter(function(e) { return e }).join(" "))
+    picker.cb = cb
+    picker.command = ["sh", "-c", 'command -v omarchy-file-select >/dev/null 2>&1 || exit 127; exec omarchy-file-select "$@"', "pick"].concat(args)
+    picker.running = true
+  }
   function focusComposer() { if (main.item && main.item.focusComposer) main.item.focusComposer() }
   function focusSearch() { appWin.sideView = "chats"; if (side.item && side.item.focusSearch) side.item.focusSearch() }
-  function openInfo(view) { appWin.infoView = view || ""; appWin.infoOpen = true }
+  function openInfo(view) { appWin.infoChat = ""; appWin.infoView = view || ""; appWin.infoOpen = true }
+  // Someone's info beside the conversation, as the TUI's: the chat's own
+  // when it's the open one.
+  function showProfile(jid) {
+    if (!jid || jid === appWin.wa.current) { appWin.openInfo(""); return }
+    appWin.infoChat = jid; appWin.infoView = ""; appWin.infoOpen = true
+  }
+  // The header's click: closes the chat's info, or shows it in place of someone's.
+  function toggleInfo() {
+    if (appWin.infoOpen && appWin.infoChat === "" && appWin.infoView === "") appWin.infoOpen = false
+    else appWin.openInfo("")
+  }
   function openSide(view) { appWin.sideView = view }
+  function toggleAccount() { menus.close(); appWin.accountOpen = !appWin.accountOpen }
 
   // A chat's menu (its row's, or the chat header's).
   function chatMenu(c) {
@@ -81,7 +113,7 @@ FloatingWindow {
   }
   Connections {
     target: appWin.wa
-    function onCurrentChanged() { if (appWin.infoOpen && appWin.infoView !== "media") appWin.infoOpen = false; appWin.searchChat = "" }
+    function onCurrentChanged() { if (appWin.infoOpen && (appWin.infoView !== "media" || appWin.infoChat !== "")) appWin.infoOpen = false; appWin.infoChat = ""; appWin.searchChat = "" }
   }
 
   Item {
@@ -184,7 +216,7 @@ FloatingWindow {
           x: parent.width - width
           width: mainArea.infoWidth
           height: parent.height
-          sourceComponent: InfoPanel { app: appWin.app; win: appWin; chat: appWin.wa.current }
+          sourceComponent: InfoPanel { app: appWin.app; win: appWin; chat: appWin.infoChat || appWin.wa.current }
         }
       }
     }
@@ -215,6 +247,17 @@ FloatingWindow {
       id: menus
       app: appWin.app
       anchors.fill: parent
+    }
+
+    Loader {
+      anchors.fill: parent
+      active: appWin.accountOpen && appWin.wa.linked
+      z: 870
+      sourceComponent: AccountMenu {
+        app: appWin.app
+        win: appWin
+        onClosed: { appWin.accountOpen = false; root.forceActiveFocus() }
+      }
     }
 
     Rectangle {
@@ -249,6 +292,23 @@ FloatingWindow {
     Shortcuts {
       app: appWin.app
       win: appWin
+    }
+
+    Process {
+      id: picker
+      property var cb: null
+      stdout: StdioCollector {
+        onStreamFinished: {
+          var files = String(text).split("\n").map(function(f) { return f.trim() }).filter(function(f) { return f })
+          var cb = picker.cb
+          picker.cb = null
+          if (files.length && cb) cb(files)
+        }
+      }
+      onExited: (code, status) => {
+        if (code === 127) appWin.toast(appWin.app.tr("The file chooser needs a newer Omarchy (omarchy-file-select).", "O seletor de arquivos precisa de um Omarchy mais novo (omarchy-file-select)."))
+        else if (code === 2) appWin.toast(appWin.app.tr("The file chooser didn't open.", "O seletor de arquivos não abriu."))
+      }
     }
   }
 

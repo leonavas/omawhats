@@ -150,7 +150,7 @@ Item {
           font.pixelSize: b.t.fsSmall + 1
           font.weight: Font.Medium
           textFormat: Text.PlainText
-          MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: b.wa.open(b.m.sender) }
+          MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: b.win.showProfile(b.m.sender) }
         }
         Text {
           visible: parent.unsaved && String(b.m.name || "").indexOf("~") === 0
@@ -377,7 +377,7 @@ Item {
         spacer: te.spacerWidth > 0 ? "&#8203;<img src=\"" + Qt.resolvedUrl("../assets/spacer.png") + "\" width=\"" + Math.round(te.spacerWidth) + "\" height=\"1\">" : ""
       })
       onLinkActivated: url => {
-        if (url.indexOf("mention:") === 0) b.wa.open(url.slice(8))
+        if (url.indexOf("mention:") === 0) b.win.showProfile(url.slice(8))
         else if (url === "more:") te.expanded = true
         else b.app.openUrl(url)
       }
@@ -406,7 +406,7 @@ Item {
         anchors.fill: parent
         source: b.media && b.media.file ? U.fileUrl(b.media.file) : ""
         fillMode: Image.PreserveAspectFit
-        playing: b.media && b.media.animated && b.app.windowFocused
+        playing: !!b.media && !!b.media.animated && !!b.app.windowFocused
         asynchronous: true
         smooth: true
         cache: true

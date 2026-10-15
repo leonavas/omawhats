@@ -100,7 +100,7 @@ Item {
           elide: Text.ElideRight
           textFormat: Text.PlainText
         }
-        Icon { id: badge; visible: !!conv.c && conv.c.verified; name: "verified"; size: conv.t.sp(16); color: conv.t.blue; anchors.verticalCenter: title.verticalCenter }
+        Icon { id: badge; visible: !!conv.c && !!conv.c.verified; name: "verified"; size: conv.t.sp(16); color: conv.t.blue; anchors.verticalCenter: title.verticalCenter }
       }
       Text {
         width: parent.width
@@ -118,7 +118,7 @@ Item {
       anchors.right: tools.left
       height: parent.height
       cursorShape: Qt.PointingHandCursor
-      onClicked: conv.win.infoOpen ? conv.win.infoOpen = false : conv.win.openInfo("")
+      onClicked: conv.win.toggleInfo()
     }
     Row {
       id: tools

@@ -58,6 +58,16 @@ Item {
 
   // Pinned to the newest message unless you scrolled up.
   readonly property bool atBottom: list.atYEnd || list.contentHeight <= list.height
+  // Any part of the newest message on screen: the round button waits
+  // until it's all gone, as WhatsApp Web's does.
+  readonly property bool newestInView: {
+    list.contentY; list.height; list.contentHeight; list.count
+    if (list.count === 0) return true
+    var it = list.itemAtIndex(0)
+    if (!it) return false
+    return it.y < list.contentY + list.height && it.y + it.height > list.contentY
+  }
+  onNewestInViewChanged: if (newestInView) root.newBelow = 0
   property bool _prevAtBottom: true
   property int _prevCount: 0
   onRowsChanged: Qt.callLater(root.settle)
@@ -89,7 +99,7 @@ Item {
     target: list
     function onContentYChanged() {
       root._prevAtBottom = root.atBottom
-      if (root.atBottom) root.newBelow = 0
+      if (root.newestInView) root.newBelow = 0
       // Near the top: the page before.
       if (list.contentY - list.originY < root.t.sp(600) && root.opened) root.wa.loadOlder(root.chat)
       dayChip.show()
@@ -194,7 +204,7 @@ Item {
   // Back to the newest, with how many came meanwhile.
   Rectangle {
     id: down
-    visible: !root.atBottom && root.opened
+    visible: !root.newestInView && root.opened
     anchors.right: parent.right
     anchors.rightMargin: root.t.sp(20)
     anchors.bottom: parent.bottom

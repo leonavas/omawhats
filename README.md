@@ -24,8 +24,22 @@ omarchy plugin enable leonavas.whatsapp-claude --section right
 Requirements: nothing beyond what Omarchy ships. The first start builds the
 bridge with Go fetched through `mise` (a minute or two, once per version; no
 cgo, so no C compiler). Audio plays through `mpv`, voice notes are recorded
-with `ffmpeg`, and it uses `notify-send`, `wl-clipboard`, `zenity` (file
-picker) and `xdg-open`.
+with `ffmpeg`, and it uses `notify-send`, `wl-clipboard` and `xdg-open`.
+
+## Updates
+
+A little after start-up and every six hours, the app reads `manifest.json`
+on GitHub's `main` branch (plain `curl` to raw.githubusercontent.com, nothing
+of yours is sent). When its `version` is newer, a notice shows on top of the
+chat list, in the bar icon's preview and in its menu. A click runs
+`omarchy plugin update leonavas.whatsapp-claude --yes` and then
+`omarchy-restart-shell` (the shell's plugin reload keeps the old QML cached),
+and the window comes back saying how it went. A checkout of your own (the
+symlink above) is never touched: the click only says to `git pull`. Settings ›
+Check for updates turns the background checks off; set
+`WACLAUDE_UPDATE_DEV=1` (or `"updateDev": true` in
+`~/.config/whatsapp-claude/settings.json`) to see the notice without a new
+version.
 
 ## Link your phone
 
@@ -61,21 +75,27 @@ English and Portuguese; zoom (Ctrl+= / Ctrl+-).
 
 ## The bar
 
-- **Icon.** WhatsApp's mark, Mono by default (Color or a glyph in the
-  settings).
+- **Icon.** WhatsApp's mark, Mono by default (Outline, Color or a glyph in
+  the settings).
 - **Badges.** Red at the bottom-right counts unread direct chats, blue at the
   top-right unread groups; muted and archived chats count in neither.
   "Group notifications" folds both into one badge.
 - **Hover preview.** The unread chats with their newest messages. A click
   opens the chat.
-- **Pause notifications** for 30 minutes, 1 hour, 8 hours or until tomorrow.
+- **Notifications.** One per new message (the author · the group, in a
+  group), with the chat's picture; none for muted chats, while paused, or
+  for the chat open on screen. A click opens the chat at that message.
+- **Pause notifications** for 30 minutes, 1 hour, 2 hours, until tomorrow or
+  until a date and time.
+- **Launch on Login / Quit.** WhatsApp starts with the shell (or on the first
+  click) and "Quit WhatsApp" stops it: no badges, no notifications.
 - **Scratchpad parking.** The window lives in a special workspace (Omarchy's
   scratchpad by default): a click shows it, another puts it away.
 
 | Mouse | Action |
 |---|---|
 | Left click | Show the window, or put it away |
-| Middle click | Close the window |
+| Middle click | Quit WhatsApp |
 | Right click | The menu |
 | Hover | Preview of what's unread |
 

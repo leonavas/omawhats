@@ -1,8 +1,8 @@
 import QtQuick
 import "../lib/Registry.js" as Reg
 
-// The notices on top of the chat list, as WhatsApp Web's: no connection,
-// notifications paused, chats still syncing.
+// The notices on top of the chat list, as WhatsApp Web's: a new version,
+// no connection, notifications paused, chats still syncing.
 Column {
   id: n
   property var app: Reg.service
@@ -10,7 +10,8 @@ Column {
   readonly property var t: app.theme
   readonly property var wa: app.wa
   spacing: t.sp(6)
-  topPadding: (offline.visible || paused.visible || sync.visible) ? t.sp(4) : 0
+  readonly property var up: app.updater
+  topPadding: (newVersion.visible || offline.visible || paused.visible || sync.visible) ? t.sp(4) : 0
   bottomPadding: topPadding
 
   component Banner: Rectangle {
@@ -20,12 +21,15 @@ Column {
     property string title: ""
     property string sub: ""
     property string action: ""
+    // The whole card answers a click, not only its link.
+    property bool clickable: false
     signal act()
     x: n.t.sp(10)
     width: n.width - n.t.sp(20)
     height: col.implicitHeight + n.t.sp(24)
     radius: n.t.sp(12)
-    color: n.t.chip
+    color: bn.clickable && whole.containsMouse ? n.t.mix(n.t.chip, n.t.fg, 0.06) : n.t.chip
+    MouseArea { id: whole; anchors.fill: parent; z: 1; visible: bn.clickable; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: bn.act() }
     Rectangle {
       id: circle
       x: n.t.sp(14)
@@ -59,6 +63,26 @@ Column {
     }
   }
 
+  // A new version (core/Updater.qml): a click updates and restarts the
+  // shell; faded while it runs.
+  Banner {
+    id: newVersion
+    visible: !!n.up && n.up.phase !== ""
+    clickable: !!n.up && n.up.phase !== "updating"
+    opacity: n.up && n.up.phase === "updating" ? 0.7 : 1
+    icon: n.up && n.up.phase === "updating" ? "sync" : "download"
+    iconBg: n.t.accent
+    title: !n.up ? "" : n.up.phase === "updating" ? n.app.tr("Updating to ", "Atualizando para a versão ") + n.up.latest + "…"
+         : n.up.phase === "updated" ? n.app.tr("Version ", "Versão ") + n.up.latest + n.app.tr(" installed", " instalada")
+         : n.app.tr("Update available", "Atualização disponível")
+    sub: !n.up ? "" : n.up.phase === "updating" ? n.app.tr("The shell restarts and the window comes back.", "O shell reinicia e a janela volta.")
+       : n.up.phase === "updated" ? ""
+       : n.app.tr("Version ", "Versão ") + n.up.latest + "."
+    action: !n.up || n.up.phase === "updating" ? ""
+          : n.up.phase === "updated" ? n.app.tr("Restart the shell to use it", "Reinicie o shell para usar")
+          : n.app.tr("Click to update", "Clique para atualizar")
+    onAct: n.up.update()
+  }
   Banner {
     id: offline
     visible: n.wa.conn === "offline" || n.wa.conn === "replaced" || (n.wa.conn === "connecting" && n.wa.everReady)

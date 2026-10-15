@@ -54,9 +54,21 @@ Item {
   readonly property string lang: setting("lang", root._ptHint ? "pt-BR" : "en")
   readonly property bool clock24: setting("clock", "24h") !== "12h"
   readonly property bool enterSends: setting("enterSends", true) !== false
-  readonly property bool notificationsOn: setting("notifications", true) !== false
-  readonly property bool soundOn: setting("sound", true) !== false
-  readonly property bool previewOn: setting("notificationPreview", true) !== false
+  // Desktop notifications and their text are the bar widget's settings
+  // ("notifications", "notificationText"), as whatsapp-tui's widget keeps
+  // them; the app's own settings stand in while no widget is on the bar.
+  readonly property bool notificationsOn: root.barOptions.notifications !== undefined ? root.barOptions.notifications !== false
+                                                                                     : setting("notifications", true) !== false
+  readonly property bool previewOn: root.barOptions.notificationText !== undefined ? root.barOptions.notificationText !== false
+                                                                                   : setting("notificationPreview", true) !== false
+  // The widget's writer, set while one is on the bar: a toggle in the app
+  // lands in the widget's settings (shell.json), where the bar reads it.
+  property var barWriter: null
+  function setNotifySetting(key, value) {
+    if (root.barWriter) root.barWriter(key === "notificationPreview" ? "notificationText" : key, value)
+    else root.setSetting(key, value)
+  }
+  readonly property bool soundOn: setting("sound", false) === true
   readonly property bool reactionNotices: setting("reactionNotifications", true) !== false
   readonly property bool doodleOn: setting("doodle", true) !== false
   readonly property real zoom: setting("zoom", 1.0)
@@ -91,12 +103,17 @@ Item {
     app: root
     dataDir: root.dataDir
     cacheDir: root.cacheDir
-    enabled: root.ready
+    enabled: root.ready && root.running
     onIncoming: m => root.notifyMessage(m)
     onReacted: ev => root.notifyReaction(ev)
     onFailed: text => { if (root.appWindow) root.appWindow.toast(text) }
   }
   readonly property alias wa: store
+
+  // New versions of the plugin on GitHub: the notice on top of the chat
+  // list, the bar's preview and menu (core/Updater.qml).
+  Updater { id: updaterObj; app: root }
+  readonly property alias updater: updaterObj
 
   readonly property var attention: store.attention
   // Notifications paused until (unix seconds); 0 when not.
@@ -106,6 +123,20 @@ Item {
   readonly property bool paused: root.pausedUntil > root.nowSec
   function pause(minutes) { root.nowSec = Date.now() / 1000; root.setSetting("pausedUntil", Math.round(root.nowSec + minutes * 60)) }
   function resume() { root.setSetting("pausedUntil", 0) }
+
+  // ---------------------------------------------------------------- running
+  // Whether WhatsApp runs (the bridge, linked to the phone): the bar widget
+  // starts it at login (Launch on Login) or on a click, and "Quit WhatsApp"
+  // stops it, as whatsapp-tui's widget does with whatsapp-tui. Stopped,
+  // nothing counts or notifies.
+  property bool running: Quickshell.env("WACLAUDE_OPEN") === "1"
+  property real startedAt: 0
+  onRunningChanged: if (running) root.startedAt = Date.now() / 1000
+  function start() { root.running = true }
+  function quit() {
+    root.windowOpen = false
+    root.running = false
+  }
 
   // ---------------------------------------------------------------- window
   property bool windowOpen: Quickshell.env("WACLAUDE_OPEN") === "1"
@@ -156,6 +187,7 @@ Item {
   property bool _launchForeground: true
   property string _launchBack: ""
   function launchWindow(foreground) {
+    root.running = true
     root._launchForeground = foreground
     root._launchBack = root.lastOtherAddress
     root.stowing = !foreground
@@ -266,10 +298,10 @@ Item {
 
   // Focus the window through Hyprland (a click on the bar doesn't move focus).
   function raiseSoon() { raiseTimer.restart() }
-  readonly property string windowTitleBase: "WhatsApp (Claude)"
+  readonly property string windowTitleBase: "Omawhats"
   function isOurTitle(title) {
     title = String(title || "")
-    return title === root.windowTitleBase || /^\(\d+\) WhatsApp \(Claude\)$/.test(title)
+    return title === root.windowTitleBase || /^\(\d+\) Omawhats$/.test(title)
   }
   function ourToplevel() {
     var list = Hyprland.toplevels ? (Hyprland.toplevels.values || []) : []
@@ -326,79 +358,83 @@ Item {
   readonly property var appWindow: windowLoader.item
 
   // ---------------------------------------------------------------- notifications
-  Component {
-    id: notifyComponent
-    Process {
-      property string chat: ""
-      property string msg: ""
-      stdout: SplitParser {
-        onRead: data => {
-          var s = String(data).trim()
-          if (s === "open" && parent && parent.chat) root.openChat(parent.chat, parent.msg)
-        }
-      }
-      onExited: destroy()
-    }
-  }
-
+  // As whatsapp-tui's widget notifies: one notification per new message,
+  // except in muted chats, while paused, and for the chat open on screen.
+  // The summary is the chat (the author · the group, in a group), the body
+  // the message with its bold, italics and strikethrough (or only "New
+  // message"), the icon the chat's picture. A click runs, in Omarchy's
+  // notification center, the IPC call that opens the chat at that message,
+  // so it still works after a shell restart. A message replayed by a
+  // reconnect notifies once; one sent before WhatsApp started was waiting
+  // already, and the badge has it.
   property real _lastSound: 0
-  // What each chat's notification said, so the next one sums them up.
-  property var _notified: ({})
+  property var _notifiedIds: ({})
+  property var _notifiedOrder: []
 
   function notifyAllowed(chat) {
     if (!root.notificationsOn || root.paused) return false
     var c = store.chat(chat)
     if (c && store.isMuted(c)) return false
-    // The chat in front of you needs no notification.
     if (root.windowFocused && store.current === chat) return false
     return true
   }
 
+  function firstNotice(chat, id) {
+    var key = chat + "|" + id
+    if (root._notifiedIds[key]) return false
+    root._notifiedIds[key] = true
+    root._notifiedOrder.push(key)
+    while (root._notifiedOrder.length > 200) delete root._notifiedIds[root._notifiedOrder.shift()]
+    return true
+  }
+
+  // A message as the notification's body: its text as markup, media by
+  // their emoji and label.
+  readonly property var _kindEmoji: ({ camera: "📷", video: "🎥", ptv: "🎥", gif: "🎞️", mic: "🎤", headphones: "🎧", document: "📄",
+                                       sticker: "🏷️", location: "📍", liveLocation: "📍", contact: "👤", poll: "📊", event: "📅" })
+  function noticeBody(m) {
+    var s = L.short(m, root.lang)
+    var text = F.styled(s.text, m.mentions, root.tr("You", "Você"))
+    var emoji = s.icon ? root._kindEmoji[s.icon] || "" : ""
+    return (emoji ? emoji + " " : "") + text
+  }
+
   function notifyMessage(m) {
-    if (!root.notifyAllowed(m.chat)) return
+    if (!m || m.from_me || (m.ts || 0) < root.startedAt - 5) return
+    if (!root.notifyAllowed(m.chat) || !root.firstNotice(m.chat, m.id)) return
     var c = store.chat(m.chat)
     var group = c ? c.kind === "group" : String(m.chat).indexOf("@g.us") > 0
     var name = store.nameOf(m.chat)
-    var s = L.short(m, root.lang)
-    var text = s.icon && m.text ? m.text : s.text
-    text = F.plain(text, m.mentions, root.tr("You", "Você"))
-    var who = m.name ? (m.name.indexOf("~") === 0 ? m.name.slice(1) : m.name) : ""
-    var line = group ? (who ? who + ": " : "") + text : text
-    var prior = root._notified[m.chat]
-    var count = prior && Date.now() - prior.at < 300000 ? prior.count + 1 : 1
-    var lines = (prior && count > 1 ? prior.lines : []).concat([line]).slice(-4)
-    root._notified[m.chat] = { count: count, lines: lines, at: Date.now() }
-    var title = name + (count > 1 ? root.tr(" (" + count + " messages)", " (" + count + " mensagens)") : "")
-    var body = root.previewOn ? lines.join("\n") : root.tr("New message", "Nova mensagem")
-    root.notify(m.chat, m.id, title, body)
+    var who = String(m.name || "").replace(/^~/, "") || (m.sender ? store.nameOf(m.sender) : "")
+    var title = group && who ? who + " · " + name : name
+    var body = root.previewOn ? root.noticeBody(m) : ""
+    root.notify(m.chat, m.id, title, body.length > 0 ? body : root.tr("New message", "Nova mensagem"))
   }
 
   function notifyReaction(ev) {
-    if (!root.reactionNotices || !root.notifyAllowed(ev.chat)) return
-    var who = String(ev.who || "").replace(/^~/, "")
+    if (!root.reactionNotices || !ev.emoji || !root.notifyAllowed(ev.chat)) return
+    if (!root.firstNotice(ev.chat, "r:" + ev.id + ":" + (ev.who || "") + ":" + ev.emoji)) return
+    var who = String(ev.who || "").replace(/^~/, "") || root.tr("Someone", "Alguém")
     var original = store.findMsg(ev.chat, ev.id)
-    var quoted = original ? F.plain(L.short(original, root.lang).text, original.mentions) : ""
-    root.notify(ev.chat, ev.id, store.nameOf(ev.chat),
-                root.tr((who || "Someone") + " reacted " + ev.emoji + " to: ", (who || "Alguém") + " reagiu com " + ev.emoji + " a: ") + '"' + quoted.slice(0, 80) + '"')
+    var quoted = original ? F.plain(L.short(original, root.lang).text, original.mentions).slice(0, 80) : ""
+    var body = root.previewOn
+      ? F.esc(root.tr(who + " reacted " + ev.emoji + " to: ", who + " reagiu com " + ev.emoji + " a: ") + "\u201c" + quoted + "\u201d")
+      : root.tr("New reaction", "Nova reação")
+    root.notify(ev.chat, ev.id, store.nameOf(ev.chat), body)
   }
 
   function notify(chat, msg, title, body) {
     var avatar = U.unfileUrl(String(store.avatar(chat)).replace(/\?.*$/, ""))
-    var p = notifyComponent.createObject(root, {
-      chat: chat, msg: msg,
-      command: ["notify-send", "-a", "WhatsApp", "-i", avatar || root.appIcon, "-A", "open=" + root.tr("Open", "Abrir"), "--wait", title, body]
-    })
-    p.running = true
+    var openArgv = ["omarchy-shell", "-q", "whatsapp-claude", "openAt", String(chat), String(msg || "")]
+    Quickshell.execDetached(["notify-send",
+      "--app-name=WhatsApp",
+      "--icon=" + (avatar || root.appIcon),
+      "--hint=string:omarchy-exec-argv:" + JSON.stringify(openArgv),
+      title,
+      body])
     if (root.soundOn && Date.now() - root._lastSound > 1500) {
       root._lastSound = Date.now()
       Quickshell.execDetached(["sh", "-c", 'for f in "$1" /usr/share/sounds/freedesktop/stereo/message-new-instant.oga /usr/share/sounds/freedesktop/stereo/message.oga /usr/share/sounds/freedesktop/stereo/bell.oga; do [ -f "$f" ] && exec pw-play "$f"; done; exit 0', "sound", root.setting("soundFile", "")])
-    }
-  }
-  // Read on the window or elsewhere: its notification sums up from scratch.
-  Connections {
-    target: store
-    function onChatsRevChanged() {
-      for (var k in root._notified) { var c = store.chatMap[k]; if (c && !c.unread && !c.marked) delete root._notified[k] }
     }
   }
 
@@ -440,27 +476,6 @@ Item {
     }
   }
 
-  // Files picked with zenity (Omarchy has it): `cb([paths])`.
-  function pickFiles(title, filter, cb) {
-    var p = pickerComponent.createObject(root, { cb: cb })
-    var args = ["zenity", "--file-selection", "--multiple", "--separator=\n", "--title=" + title]
-    if (filter) args.push("--file-filter=" + filter)
-    p.command = args
-    p.running = true
-  }
-  Component {
-    id: pickerComponent
-    Process {
-      property var cb: null
-      stdout: StdioCollector {
-        onStreamFinished: {
-          var files = String(text).split("\n").map(function(s) { return s.trim() }).filter(function(s) { return s.length > 0 })
-          if (files.length && parent.cb) parent.cb(files)
-        }
-      }
-      onExited: destroy()
-    }
-  }
 
   // What the clipboard has: a picture (saved to a file) or text. cb({image}|{text}).
   function readClipboard(cb) {
@@ -509,10 +524,12 @@ Item {
     function show(): void { root.showWindow() }
     function hide(): void { root.hideWindow() }
     function open(chat: string): void { root.openChat(chat, "") }
+    function openAt(chat: string, msg: string): void { root.openChat(chat, msg) }
+    function quit(): void { root.quit() }
     function pause(minutes: int): void { root.pause(minutes) }
     function resume(): void { root.resume() }
     function status(): string {
-      return JSON.stringify({ state: store.conn, linked: store.linked, attention: store.attention, paused: root.paused,
+      return JSON.stringify({ running: root.running, state: store.conn, linked: store.linked, attention: store.attention, paused: root.paused,
                               me: store.me, open: root.windowOpen, current: store.current })
     }
   }

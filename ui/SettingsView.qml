@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import "../lib/Bar.js" as Bar
 import "../lib/Util.js" as U
 import "../lib/Registry.js" as Reg
 
@@ -131,7 +132,7 @@ Item {
           Text { width: parent.width; text: sv.wa.me ? (sv.wa.me.name || "") : ""; color: sv.t.textBright; font.family: sv.t.font; font.pixelSize: sv.t.px(18); elide: Text.ElideRight }
           Text { width: parent.width; text: sv.wa.me ? U.phone(sv.wa.me.phone) : ""; color: sv.t.dim; font.family: sv.t.font; font.pixelSize: sv.t.fsText }
         }
-        MouseArea { id: mema; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: sv.win.sideView = "profile" }
+        MouseArea { id: mema; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: sv.win.dialog("profile") }
       }
       Rectangle { x: sv.t.sp(28); width: parent.width - sv.t.sp(56); height: 1; color: sv.t.line }
 
@@ -181,13 +182,13 @@ Item {
       Toggle {
         label: sv.app.tr("Message notifications", "Notificações de mensagens")
         on: sv.app.notificationsOn
-        onToggled: value => sv.app.setSetting("notifications", value)
+        onToggled: value => sv.app.setNotifySetting("notifications", value)
       }
       Toggle {
         label: sv.app.tr("Show previews", "Mostrar prévias")
         sub: sv.app.tr("The message's text in the notification", "O texto da mensagem na notificação")
         on: sv.app.previewOn
-        onToggled: value => sv.app.setSetting("notificationPreview", value)
+        onToggled: value => sv.app.setNotifySetting("notificationPreview", value)
       }
       Toggle {
         label: sv.app.tr("Reactions", "Reações")
@@ -204,16 +205,14 @@ Item {
         id: pauseChoice
         label: sv.app.paused ? sv.app.tr("Resume notifications", "Reativar notificações") : sv.app.tr("Pause notifications", "Pausar notificações")
         icon: sv.app.paused ? "bell" : "muted"
-        value: sv.app.paused ? sv.app.tr("until ", "até ") + U.clock(sv.app.pausedUntil, sv.app.clock24) : ""
+        value: sv.app.paused ? sv.app.tr("until ", "até ") + Bar.clockLabel(sv.app.pausedUntil, Date.now() / 1000, sv.app.lang) : ""
         onClicked: {
           if (sv.app.paused) { sv.app.resume(); return }
           sv.win.menuAt(pauseChoice, [
             { label: sv.app.tr("30 minutes", "30 minutos"), action: function() { sv.app.pause(30) } },
             { label: sv.app.tr("1 hour", "1 hora"), action: function() { sv.app.pause(60) } },
-            { label: sv.app.tr("8 hours", "8 horas"), action: function() { sv.app.pause(480) } },
-            { label: sv.app.tr("Until tomorrow", "Até amanhã"), action: function() {
-                var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0)
-                sv.app.pause(Math.max(1, (d.getTime() - Date.now()) / 60000)) } }
+            { label: sv.app.tr("2 hours", "2 horas"), action: function() { sv.app.pause(120) } },
+            { label: sv.app.tr("Until tomorrow", "Até amanhã"), action: function() { sv.app.pause(Bar.minutesToTomorrow(Date.now() / 1000)) } }
           ], width - sv.t.sp(220), height)
         }
       }
@@ -234,6 +233,25 @@ Item {
         icon: "clock"
         value: sv.app.clock24 ? "24h" : "12h"
         onClicked: sv.app.setSetting("clock", sv.app.clock24 ? "12h" : "24h")
+      }
+      // New versions (core/Updater.qml): the background checks, and this
+      // version, a click looks now (or updates, when one is waiting).
+      Toggle {
+        label: sv.app.tr("Check for updates", "Procurar atualizações")
+        sub: sv.app.tr("A notice on top of the chats when GitHub has a new version", "Um aviso no topo das conversas quando houver versão nova no GitHub")
+        on: sv.app.updater.auto
+        onToggled: value => sv.app.setSetting("updateCheck", value)
+      }
+      Choice {
+        readonly property var up: sv.app.updater
+        label: up.phase === "available" ? sv.app.tr("Update to ", "Atualizar para a versão ") + up.latest
+             : up.phase === "updating" ? sv.app.tr("Updating…", "Atualizando…")
+             : up.phase === "updated" ? sv.app.tr("Restart the shell to update", "Reinicie o shell para atualizar")
+             : up.checking ? sv.app.tr("Checking for updates…", "Procurando atualizações…")
+             : sv.app.tr("Check now", "Procurar agora")
+        icon: up.phase !== "" ? "download" : "refresh"
+        value: up.version ? "v" + up.version : ""
+        onClicked: up.phase !== "" ? up.update() : up.check(true)
       }
       Choice {
         label: sv.app.tr("Keyboard shortcuts", "Atalhos do teclado")

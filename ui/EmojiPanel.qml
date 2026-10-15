@@ -35,7 +35,7 @@ Rectangle {
     var out = [{ key: "recent", label: ep.app.tr("Recent", "Recentes"), icon: "recent", items: ep.recent }]
     return out.concat(cat)
   }
-  readonly property var found: ep.query ? Emoji.search(ep.query, 120) : []
+  readonly property var found: ep.query ? Emoji.search(ep.query, 120, ep.app.lang, ep.recent) : []
 
   onVisibleChanged: if (visible && ep.tab === "stickers") ep.wa.loadStickers()
 

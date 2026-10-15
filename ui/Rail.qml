@@ -2,7 +2,7 @@ import QtQuick
 import "../lib/Registry.js" as Reg
 
 // WhatsApp Web's rail: the tabs on top (Chats with what's unread, starred
-// messages), settings and your photo at the bottom.
+// messages), settings and your photo at the bottom (your menu).
 Rectangle {
   id: rail
   property var app: Reg.service
@@ -101,17 +101,37 @@ Rectangle {
         anchors.centerIn: parent
         width: rail.t.sp(34); height: width; radius: width / 2
         color: "transparent"
-        border.width: rail.win.sideView === "profile" ? 2 : 0
+        border.width: rail.win.accountOpen ? 2 : 0
         border.color: rail.t.text
       }
       Avatar {
+        id: me
         anchors.centerIn: parent
         size: rail.t.sp(28)
         jid: rail.wa.me ? rail.wa.me.jid : ""
         name: rail.wa.me ? rail.wa.me.name : ""
       }
-      MouseArea { id: pma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: rail.win.sideView = "profile" }
-      Tip { text: rail.app.tr("Profile", "Perfil"); shown: pma.containsMouse }
+      // A newer version, as the TUI's arrow by your photo: the menu has it.
+      Rectangle {
+        readonly property string phase: rail.app.updater ? rail.app.updater.phase : ""
+        visible: phase === "available" || phase === "updated"
+        x: me.x + me.width - width / 2 - rail.t.sp(1)
+        y: me.y - rail.t.sp(3)
+        width: rail.t.sp(16); height: width; radius: width / 2
+        color: rail.t.green
+        border.width: 2
+        border.color: rail.t.rail
+        Text {
+          anchors.centerIn: parent
+          text: parent.phase === "updated" ? "↻" : "↑"
+          color: rail.t.onColor(rail.t.green)
+          font.family: rail.t.font
+          font.pixelSize: rail.t.sp(10)
+          font.weight: Font.Bold
+        }
+      }
+      MouseArea { id: pma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: rail.win.toggleAccount() }
+      Tip { text: rail.app.tr("You · Alt+S", "Você · Alt+S"); shown: pma.containsMouse && !rail.win.accountOpen }
     }
   }
 }

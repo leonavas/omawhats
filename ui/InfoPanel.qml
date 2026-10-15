@@ -4,11 +4,13 @@ import Quickshell
 import "../lib/Util.js" as U
 import "../lib/Format.js" as F
 import "../lib/Labels.js" as L
+import "../lib/Hours.js" as H
 import "../lib/Registry.js" as Reg
 
 // The right side panel, as WhatsApp Web's: the contact's or group's info
-// (photo, name, about, media, members, groups in common, mute, starred,
-// delete), the search in the chat, or its media, links and docs.
+// (photo, name, about, a business's details and hours, media, members,
+// groups in common, mute, starred, delete), the search in the chat, or its
+// media, links and docs. The open chat's, or of someone picked in it.
 Rectangle {
   id: ip
   property var app: Reg.service
@@ -20,9 +22,12 @@ Rectangle {
   readonly property var p: wa.profile(chat)
   readonly property bool group: chat.indexOf("@g.us") > 0
   readonly property string view: win.infoView
+  // Someone picked in the conversation, not the open chat.
+  readonly property bool other: chat !== "" && chat !== wa.current
   color: t.panel
 
   Component.onCompleted: ip.wa.askProfile(ip.chat)
+  onChatChanged: { ip.week = false; if (ip.chat) ip.wa.askProfile(ip.chat) }
 
   // ------------------------------------------------------------ header
   Item {
@@ -59,11 +64,6 @@ Rectangle {
   }
 
   // ------------------------------------------------------------ info
-  component Card: Rectangle {
-    width: parent ? parent.width : 0
-    height: childrenRect.height
-    color: "transparent"
-  }
   component Row2: Item {
     id: r2
     property string icon: ""
@@ -97,6 +97,41 @@ Rectangle {
     MouseArea { id: rma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: r2.clicked() }
   }
   component Gap: Rectangle { width: parent ? parent.width : 0; height: ip.t.sp(10); color: ip.t.alpha(ip.t.fg, ip.t.dark ? 0.03 : 0.04) }
+  // A section's dim title, with an icon at its right end.
+  component Title: Item {
+    id: tt
+    property string text: ""
+    property string icon: ""
+    width: parent ? parent.width - parent.leftPadding - parent.rightPadding : 0
+    height: ip.t.sp(22)
+    Text { anchors.verticalCenter: parent.verticalCenter; text: tt.text; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
+    Icon { visible: tt.icon !== ""; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; name: tt.icon; size: ip.t.sp(18); color: ip.t.dim }
+  }
+  // A square button under the name: search, message.
+  component Action: Rectangle {
+    id: act
+    property string icon: ""
+    property string label: ""
+    signal clicked()
+    width: ip.t.sp(110); height: ip.t.sp(64); radius: ip.t.sp(12)
+    color: ama.containsMouse ? ip.t.hoverStrong : "transparent"
+    border.width: 1
+    border.color: ip.t.lineStrong
+    Column {
+      anchors.centerIn: parent
+      spacing: ip.t.sp(4)
+      Icon { anchors.horizontalCenter: parent.horizontalCenter; name: act.icon; size: ip.t.sp(22); color: ip.t.accent }
+      Text { anchors.horizontalCenter: parent.horizontalCenter; text: act.label; color: ip.t.text; font.family: ip.t.font; font.pixelSize: ip.t.fsSmall + 1 }
+    }
+    MouseArea { id: ama; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: act.clicked() }
+  }
+
+  // The name the panel shows, and whether the number is worth a line under it.
+  readonly property string title: c ? wa.chatName(c) : (p && p.name ? p.name : wa.nameOf(chat))
+  readonly property string number: group ? "" : (p && p.phone ? U.phone(p.phone) : (c && c.phone ? U.phone(c.phone) : ""))
+  // A business's week, where it stands now.
+  readonly property var op: p && p.hours && p.hours.length ? H.opening(p.hours, p.tz, app.lang) : null
+  property bool week: false
 
   Component {
     id: infoC
@@ -109,7 +144,8 @@ Rectangle {
         id: col
         width: parent.width
 
-        // The photo, the name, the number (or the members).
+        // The picture, the name and number (or the members), the name
+        // they set, a business's category and whether it's open.
         Column {
           width: parent.width
           spacing: ip.t.sp(6)
@@ -119,13 +155,18 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             size: ip.t.sp(200)
             jid: ip.chat
-            name: ip.c ? ip.wa.chatName(ip.c) : ip.wa.nameOf(ip.chat)
+            name: ip.title
             group: ip.group
             source: ip.p && ip.p.photo ? ip.p.photo : ""
+            // Big over everything; a word when there's none, or not yet.
             MouseArea {
               anchors.fill: parent
-              cursorShape: ip.p && ip.p.photo ? Qt.PointingHandCursor : Qt.ArrowCursor
-              onClicked: if (ip.p && ip.p.photo) ip.win.viewMedia({ chat: ip.chat, id: "photo", kind: "image", media: { file: U.unfileUrl(ip.p.photo) }, ts: 0, name: ip.wa.nameOf(ip.chat) })
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                if (ip.p && ip.p.photo) ip.win.viewMedia({ chat: ip.chat, id: "photo", kind: "image", media: { file: U.unfileUrl(ip.p.photo) }, ts: 0, name: ip.title })
+                else if (ip.p && ip.p.photo === "") ip.win.toast(ip.app.tr("No profile photo", "Sem foto do perfil"))
+                else ip.win.toast(ip.app.tr("Loading the photo…", "Carregando a foto…"))
+              }
             }
           }
           Item { width: 1; height: ip.t.sp(6) }
@@ -134,7 +175,7 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
-            text: ip.c ? ip.wa.chatName(ip.c) : (ip.p && ip.p.name ? ip.p.name : ip.wa.nameOf(ip.chat))
+            text: ip.title
             color: ip.t.textBright
             font.family: ip.t.font
             font.pixelSize: ip.t.px(22)
@@ -146,7 +187,7 @@ Rectangle {
             horizontalAlignment: Text.AlignHCenter
             visible: text !== ""
             text: ip.group ? (ip.p && ip.p.members ? ip.app.tr("Group · " + ip.p.members.length + " members", "Grupo · " + ip.p.members.length + " membros") : "")
-                           : (ip.p && ip.p.phone ? U.phone(ip.p.phone) : (ip.c && ip.c.phone ? U.phone(ip.c.phone) : ""))
+                           : (ip.number !== ip.title ? ip.number : "")
             color: ip.t.dim
             font.family: ip.t.font
             font.pixelSize: ip.t.fsName - 1
@@ -155,9 +196,39 @@ Rectangle {
             width: parent.width - ip.t.sp(40)
             anchors.horizontalCenter: parent.horizontalCenter
             horizontalAlignment: Text.AlignHCenter
-            visible: !ip.group && !!ip.p && !!ip.p.push && ip.wa.chatName(ip.c).indexOf(ip.p.push) < 0
+            visible: !ip.group && !!ip.p && !!ip.p.push && !ip.p.biz && ip.title.indexOf(ip.p.push) < 0
             text: "~" + (ip.p ? ip.p.push || "" : "")
             color: ip.t.faint
+            font.family: ip.t.font
+            font.pixelSize: ip.t.fsText
+          }
+          Text {
+            width: parent.width - ip.t.sp(40)
+            anchors.horizontalCenter: parent.horizontalCenter
+            horizontalAlignment: Text.AlignHCenter
+            visible: !!ip.p && !!ip.p.category
+            text: ip.p ? ip.p.category || "" : ""
+            wrapMode: Text.Wrap
+            color: ip.t.dim
+            font.family: ip.t.font
+            font.pixelSize: ip.t.fsText
+          }
+          // "Aberta até às 17:00", "Fechada abre amanhã às 08:00".
+          Row {
+            visible: !!ip.op
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: ip.t.sp(5)
+            Text { text: ip.op && ip.op.open ? ip.app.tr("Open", "Aberta") : ip.app.tr("Closed", "Fechada"); color: ip.op && ip.op.open ? ip.t.online : ip.t.danger; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
+            Text { visible: text !== ""; text: ip.op ? ip.op.next : ""; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
+          }
+          Text {
+            width: parent.width - ip.t.sp(40)
+            anchors.horizontalCenter: parent.horizontalCenter
+            horizontalAlignment: Text.AlignHCenter
+            visible: !ip.p || !!ip.p.error
+            text: !ip.p ? ip.app.tr("Loading…", "Carregando…") : ip.app.tr("Didn't load: ", "Não carregou: ") + ip.p.error
+            wrapMode: Text.Wrap
+            color: !ip.p ? ip.t.dim : ip.t.danger
             font.family: ip.t.font
             font.pixelSize: ip.t.fsText
           }
@@ -165,83 +236,180 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             topPadding: ip.t.sp(12)
             spacing: ip.t.sp(12)
-            Rectangle {
-              width: ip.t.sp(110); height: ip.t.sp(64); radius: ip.t.sp(12)
-              color: sqa.containsMouse ? ip.t.hoverStrong : "transparent"
-              border.width: 1
-              border.color: ip.t.lineStrong
-              Column {
-                anchors.centerIn: parent
-                spacing: ip.t.sp(4)
-                Icon { anchors.horizontalCenter: parent.horizontalCenter; name: "search"; size: ip.t.sp(22); color: ip.t.accent }
-                Text { anchors.horizontalCenter: parent.horizontalCenter; text: ip.app.tr("Search", "Pesquisar"); color: ip.t.text; font.family: ip.t.font; font.pixelSize: ip.t.fsSmall + 1 }
-              }
-              MouseArea { id: sqa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: ip.win.infoView = "search" }
+            // Someone picked in the conversation: a chat with them.
+            Action {
+              visible: ip.other
+              icon: "chat"
+              label: ip.app.tr("Message", "Conversar")
+              onClicked: ip.wa.open(ip.chat)
+            }
+            Action {
+              icon: "search"
+              label: ip.app.tr("Search", "Pesquisar")
+              onClicked: ip.win.infoView = "search"
             }
           }
         }
         Gap {}
 
-        // About, or the group's description.
+        // A group's description, and when it was made.
         Column {
           width: parent.width
-          visible: !!ip.p && !!ip.p.about
+          visible: ip.group && !!ip.p && !ip.p.error
           leftPadding: ip.t.sp(30)
           rightPadding: ip.t.sp(30)
           topPadding: ip.t.sp(16)
           bottomPadding: ip.t.sp(16)
           spacing: ip.t.sp(6)
-          Text {
-            text: ip.group ? ip.app.tr("Group description", "Descrição do grupo") : ip.app.tr("About", "Recado")
-            color: ip.t.dim
-            font.family: ip.t.font
-            font.pixelSize: ip.t.fsText
-          }
+          Title { text: ip.app.tr("Description", "Descrição") }
           TextEdit {
+            visible: !!ip.p && !!ip.p.about && ip.p.about.trim() !== ""
             width: parent.width - ip.t.sp(60)
             readOnly: true
             selectByMouse: true
             wrapMode: TextEdit.Wrap
             textFormat: TextEdit.RichText
-            text: ip.p && ip.p.about ? F.render(ip.p.about, { link: ip.t.html.link, mention: ip.t.html.mention, code: ip.t.html.code, codeBg: ip.t.html.codeBg, quote: ip.t.html.quote, quoteText: ip.t.html.quoteText }) : ""
+            text: ip.group && ip.p && ip.p.about ? F.render(ip.p.about, { link: ip.t.html.link, mention: ip.t.html.mention, code: ip.t.html.code, codeBg: ip.t.html.codeBg, quote: ip.t.html.quote, quoteText: ip.t.html.quoteText }) : ""
             color: ip.t.text
             font.family: ip.t.font
             font.pixelSize: ip.t.fsName - 1
             onLinkActivated: url => ip.app.openUrl(url)
           }
           Text {
-            visible: ip.group && !!ip.p && !!ip.p.created
-            text: ip.p && ip.p.created ? ip.app.tr("Created ", "Criado ") + (ip.p.owner ? ip.app.tr("by " + ip.p.owner + ", ", "por " + ip.p.owner + ", ") : "") + U.shortDate(ip.p.created, ip.app.lang) : ""
+            visible: !ip.p || !ip.p.about || ip.p.about.trim() === ""
+            text: ip.app.tr("No description", "Sem descrição")
+            color: ip.t.faint
+            font.family: ip.t.font
+            font.pixelSize: ip.t.fsName - 1
+          }
+          Text {
+            visible: !!ip.p && !!ip.p.created
+            width: parent.width - ip.t.sp(60)
+            wrapMode: Text.Wrap
+            text: ip.p && ip.p.created ? ip.app.tr("Created ", "Criado ") + (ip.p.owner ? ip.app.tr("by " + ip.p.owner + " ", "por " + ip.p.owner + " ") : "")
+                                         + ip.app.tr("on ", "em ") + U.shortDate(ip.p.created, ip.app.lang) + ip.app.tr(" at ", " às ") + U.clock(ip.p.created, ip.app.clock24) : ""
             color: ip.t.faint
             font.family: ip.t.font
             font.pixelSize: ip.t.fsSmall
           }
         }
-        Gap { visible: !!ip.p && !!ip.p.about }
+        Gap { visible: ip.group && !!ip.p && !ip.p.error }
 
-        // A business's details.
+        // A business's details: what it does, its hours today (a click
+        // opens the week), the address with Google Maps, e-mail, sites.
         Column {
+          id: biz
           width: parent.width
-          visible: !ip.group && !!ip.p && (!!ip.p.business || !!ip.p.address || !!ip.p.email)
+          visible: !ip.group && !!ip.p && !!ip.p.biz
           leftPadding: ip.t.sp(30)
           rightPadding: ip.t.sp(30)
           topPadding: ip.t.sp(14)
           bottomPadding: ip.t.sp(14)
-          spacing: ip.t.sp(8)
-          Text { visible: !!ip.p && !!ip.p.business; text: ip.app.tr("Business account", "Conta comercial"); color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
-          Text { visible: !!ip.p && !!ip.p.category; width: parent.width - ip.t.sp(60); text: ip.p ? ip.p.category || "" : ""; color: ip.t.text; font.family: ip.t.font; font.pixelSize: ip.t.fsText; wrapMode: Text.Wrap }
-          Text { visible: !!ip.p && !!ip.p.description; width: parent.width - ip.t.sp(60); text: ip.p ? ip.p.description || "" : ""; color: ip.t.text; font.family: ip.t.font; font.pixelSize: ip.t.fsText; wrapMode: Text.Wrap }
-          Text { visible: !!ip.p && !!ip.p.address; width: parent.width - ip.t.sp(60); text: ip.p ? ip.p.address || "" : ""; color: ip.t.text; font.family: ip.t.font; font.pixelSize: ip.t.fsText; wrapMode: Text.Wrap
-            MouseArea { anchors.fill: parent; enabled: !!ip.p && !!ip.p.maps; cursorShape: Qt.PointingHandCursor; onClicked: ip.app.openUrl(ip.p.maps) } }
+          spacing: ip.t.sp(10)
+          readonly property real inner: width - leftPadding - rightPadding
+          readonly property bool empty: !!ip.p && !ip.p.description && !ip.op && !ip.p.address && !ip.p.maps && !ip.p.email && !(ip.p.website && ip.p.website.length)
+          Title { text: ip.app.tr("Business account", "Conta comercial"); icon: "info" }
+          Text { visible: !!ip.p && !!ip.p.description; width: biz.inner; text: ip.p ? ip.p.description || "" : ""; color: ip.t.text; font.family: ip.t.font; font.pixelSize: ip.t.fsText; wrapMode: Text.Wrap }
+          Item {
+            visible: !!ip.op
+            width: biz.inner
+            height: ip.t.sp(24)
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: !ip.op ? "" : ip.op.always ? ip.app.tr("Open 24 hours", "Aberta 24 horas") : ip.op.open ? ip.app.tr("Open now", "Aberta agora") : ip.app.tr("Closed now", "Fechada agora")
+              color: ip.op && ip.op.open ? ip.t.online : ip.t.danger
+              font.family: ip.t.font
+              font.pixelSize: ip.t.fsText
+            }
+            Row {
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: ip.t.sp(4)
+              Text { anchors.verticalCenter: parent.verticalCenter; text: ip.op && !ip.op.always ? H.dayHours(ip.p.hours, ip.op.day, ip.app.lang) : ""; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
+              Icon { anchors.verticalCenter: parent.verticalCenter; name: ip.week ? "chevronUp" : "chevronDown"; size: ip.t.sp(20); color: ip.t.dim }
+            }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ip.week = !ip.week }
+          }
+          Column {
+            visible: !!ip.op && ip.week
+            width: biz.inner
+            spacing: ip.t.sp(4)
+            Repeater {
+              model: 7
+              delegate: Item {
+                id: day
+                required property int index
+                readonly property bool today: !!ip.op && ip.op.day === day.index
+                width: parent.width
+                height: ip.t.sp(20)
+                Text { text: H.dayName(day.index, ip.app.lang); color: day.today ? ip.t.text : ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText; font.weight: day.today ? Font.Medium : Font.Normal }
+                Text { anchors.right: parent.right; text: ip.p && ip.p.hours ? H.dayHours(ip.p.hours, day.index, ip.app.lang) : ""; color: day.today ? ip.t.text : ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText; font.weight: day.today ? Font.Medium : Font.Normal }
+              }
+            }
+          }
+          Column {
+            visible: !!ip.p && (!!ip.p.address || !!ip.p.maps)
+            width: biz.inner
+            spacing: ip.t.sp(4)
+            Text {
+              visible: !!ip.p && !!ip.p.address
+              width: parent.width
+              text: ip.p ? (ip.p.address || "").trim() : ""
+              color: ip.t.text
+              font.family: ip.t.font
+              font.pixelSize: ip.t.fsText
+              wrapMode: Text.Wrap
+              MouseArea { anchors.fill: parent; enabled: !!ip.p && !!ip.p.maps; cursorShape: Qt.PointingHandCursor; onClicked: ip.app.openUrl(ip.p.maps) }
+            }
+            Row {
+              visible: !!ip.p && !!ip.p.maps
+              spacing: ip.t.sp(4)
+              Icon { anchors.verticalCenter: parent.verticalCenter; name: "location"; size: ip.t.sp(16); color: ip.t.link }
+              Text {
+                text: ip.app.tr("Open in Google Maps", "Abrir no Google Maps")
+                color: ip.t.link
+                font.family: ip.t.font
+                font.pixelSize: ip.t.fsText
+                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ip.app.openUrl(ip.p.maps) }
+              }
+            }
+          }
           Text { visible: !!ip.p && !!ip.p.email; text: ip.p ? ip.p.email || "" : ""; color: ip.t.link; font.family: ip.t.font; font.pixelSize: ip.t.fsText
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ip.app.openUrl("mailto:" + ip.p.email) } }
           Repeater {
             model: ip.p && ip.p.website ? ip.p.website : []
-            delegate: Text { required property var modelData; text: modelData; color: ip.t.link; font.family: ip.t.font; font.pixelSize: ip.t.fsText
-              MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ip.app.openUrl(modelData) } }
+            delegate: Text { required property var modelData; width: Math.min(implicitWidth, biz.inner); elide: Text.ElideRight; text: modelData; color: ip.t.link; font.family: ip.t.font; font.pixelSize: ip.t.fsText
+              MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ip.app.openUrl(/^https?:\/\//.test(modelData) ? modelData : "https://" + modelData) } }
+          }
+          Text { visible: biz.empty; text: ip.app.tr("This is a business account.", "Esta é uma conta comercial."); color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
+        }
+        Gap { visible: biz.visible }
+
+        // Their about.
+        Column {
+          id: about
+          width: parent.width
+          visible: !ip.group && !!ip.p && !!ip.p.about && ip.p.about.trim() !== ""
+          leftPadding: ip.t.sp(30)
+          rightPadding: ip.t.sp(30)
+          topPadding: ip.t.sp(16)
+          bottomPadding: ip.t.sp(16)
+          spacing: ip.t.sp(6)
+          Title { text: ip.app.tr("About", "Recado") }
+          TextEdit {
+            width: parent.width - ip.t.sp(60)
+            readOnly: true
+            selectByMouse: true
+            wrapMode: TextEdit.Wrap
+            textFormat: TextEdit.RichText
+            text: !ip.group && ip.p && ip.p.about ? F.render(ip.p.about, { link: ip.t.html.link, mention: ip.t.html.mention, code: ip.t.html.code, codeBg: ip.t.html.codeBg, quote: ip.t.html.quote, quoteText: ip.t.html.quoteText }) : ""
+            color: ip.t.text
+            font.family: ip.t.font
+            font.pixelSize: ip.t.fsName - 1
+            onLinkActivated: url => ip.app.openUrl(url)
           }
         }
-        Gap { visible: !ip.group && !!ip.p && (!!ip.p.business || !!ip.p.address || !!ip.p.email) }
+        Gap { visible: about.visible }
 
         Row2 {
           icon: "mediaGallery"
@@ -259,7 +427,8 @@ Rectangle {
         }
         Row2 {
           id: muteRow
-          readonly property bool muted: ip.wa.isMuted(ip.c)
+          visible: !!ip.c
+          readonly property bool muted: !!ip.wa.isMuted(ip.c)
           icon: muted ? "muted" : "bell"
           label: muted ? ip.app.tr("Unmute notifications", "Reativar notificações") : ip.app.tr("Mute notifications", "Silenciar notificações")
           onClicked: {
@@ -279,7 +448,8 @@ Rectangle {
         }
         Gap {}
 
-        // A group's members.
+        // A group's members, all of them: you first, then the admins; a
+        // click opens a chat with one.
         Column {
           width: parent.width
           visible: ip.group && !!ip.p && !!ip.p.members
@@ -293,22 +463,19 @@ Rectangle {
             font.pixelSize: ip.t.fsText
           }
           Repeater {
-            model: ip.p && ip.p.members ? ip.p.members.slice(0, ip.showAll ? 1024 : 12) : []
+            model: ip.group && ip.p && ip.p.members ? ip.p.members : []
             delegate: PersonRow {
+              id: member
               required property var modelData
+              readonly property string number: member.modelData.phone ? U.phone(member.modelData.phone) : ""
               app: ip.app
-              jid: modelData.jid
-              name: modelData.me ? ip.app.tr("You", "Você") : (modelData.name || U.phone(modelData.phone))
-              sub: modelData.name ? (modelData.push ? "~" + modelData.push : "") : (modelData.push ? "~" + modelData.push : "")
-              badge: modelData.admin ? ip.app.tr("Group admin", "Admin do grupo") : ""
-              onClicked: if (!modelData.me) { ip.wa.open(modelData.jid) }
+              jid: member.modelData.jid
+              name: member.modelData.me ? ip.app.tr("You", "Você") : (member.modelData.name || member.number || U.phone(String(member.modelData.jid).split("@")[0]))
+              // The number under a saved name; the name they set under a number.
+              sub: member.modelData.me ? "" : (member.modelData.name ? member.number : (member.modelData.push ? "~" + member.modelData.push : ""))
+              badge: member.modelData.admin ? ip.app.tr("Group admin", "Admin do grupo") : ""
+              onClicked: if (!member.modelData.me) ip.wa.open(member.modelData.jid)
             }
-          }
-          Row2 {
-            visible: !!ip.p && !!ip.p.members && ip.p.members.length > 12 && !ip.showAll
-            icon: "chevronDown"
-            label: ip.app.tr("View all (" + (ip.p && ip.p.members ? ip.p.members.length - 12 : 0) + " more)", "Ver todos (mais " + (ip.p && ip.p.members ? ip.p.members.length - 12 : 0) + ")")
-            onClicked: ip.showAll = true
           }
         }
         Gap { visible: ip.group && !!ip.p && !!ip.p.members }
@@ -340,12 +507,11 @@ Rectangle {
         }
         Gap { visible: !ip.group && !!ip.p && !!ip.p.common && ip.p.common.length > 0 }
 
-        Row2 { icon: "nosign"; label: ip.app.tr("Clear chat", "Limpar conversa"); danger: true; onClicked: ip.win.dialog("clearChat", { chat: ip.chat }) }
-        Row2 { icon: "delete"; label: ip.app.tr("Delete chat", "Apagar conversa"); danger: true; onClicked: ip.win.dialog("deleteChat", { chat: ip.chat }) }
+        Row2 { visible: !!ip.c; icon: "nosign"; label: ip.app.tr("Clear chat", "Limpar conversa"); danger: true; onClicked: ip.win.dialog("clearChat", { chat: ip.chat }) }
+        Row2 { visible: !!ip.c; icon: "delete"; label: ip.app.tr("Delete chat", "Apagar conversa"); danger: true; onClicked: ip.win.dialog("deleteChat", { chat: ip.chat }) }
       }
     }
   }
-  property bool showAll: false
 
   // ------------------------------------------------------------ search
   Component {

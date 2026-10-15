@@ -70,11 +70,12 @@ Item {
       if (!(c.unread > 0 || c.marked)) continue
       if (c.archived) { out.archived++; continue }
       if (wa.isMuted(c)) { out.muted++; continue }
+      // The badges count chats, one each however many messages wait in it,
+      // as WhatsApp does.
       out.chats++
-      var n = Math.max(c.unread || 0, 1)
-      out.messages += n
-      if (c.kind === "group") out.groups += n
-      else out.direct += n
+      out.messages += Math.max(c.unread || 0, 1)
+      if (c.kind === "group") out.groups++
+      else out.direct++
     }
     return out
   }
@@ -294,6 +295,39 @@ Item {
   function profile(jid) { wa.profilesRev; return wa.profiles[jid] || null }
   function askProfile(jid) { wa.send({ c: "profile", chat: jid }) }
 
+  // Your name and about, changed from the profile: shown at once, and put
+  // back if WhatsApp refuses.
+  property var undoName: null
+  property var undoAbout: null
+  function setMyName(text) {
+    text = String(text || "").trim()
+    if (!wa.me || text === "" || text === wa.me.name) return
+    wa.undoName = wa.me.name || ""
+    wa.me = Object.assign({}, wa.me, { name: text })
+    wa.send({ c: "set_name", text: text })
+  }
+  function setMyAbout(text) {
+    text = String(text || "").trim()
+    var p = wa.me ? wa.profiles[wa.me.jid] || {} : null
+    if (!p || text === "" || text === (p.about || "")) return
+    wa.undoAbout = p.about || ""
+    wa.setMyAboutLocal(text)
+    wa.send({ c: "set_about", text: text })
+  }
+  // Your photo: a picture file (cropped and sent by the bridge), or "" to
+  // remove it. photoBusy while it goes.
+  property bool photoBusy: false
+  function setMyPhoto(path) {
+    if (!wa.me || wa.photoBusy) return
+    wa.photoBusy = true
+    wa.send({ c: "set_photo", text: String(path || "") })
+  }
+  function setMyAboutLocal(text) {
+    if (!wa.me) return
+    wa.profiles[wa.me.jid] = Object.assign({}, wa.profiles[wa.me.jid] || {}, { about: text })
+    wa.profilesRev++
+  }
+
   // ---------------------------------------------------------------- media
   // Downloads under way, by chat + id; failures, the same way.
   property var downloads: ({})
@@ -376,6 +410,21 @@ Item {
       break
     case "me":
       if (ev.me) wa.me = ev.me
+      // The presence carries your name: the others see the new one at once.
+      if (wa.undoName !== null) {
+        wa.send({ c: "presence", state: wa.app.windowFocused ? "available" : "unavailable" })
+        wa.failed(wa.app.tr("Name changed", "Nome alterado"))
+      }
+      wa.undoName = null
+      break
+    case "photo_set":
+      wa.photoBusy = false
+      wa.failed(ev.removed ? wa.app.tr("Profile photo removed", "Foto do perfil removida") : wa.app.tr("Profile photo changed", "Foto do perfil alterada"))
+      break
+    case "about":
+      if (wa.undoAbout !== null) wa.failed(wa.app.tr("About changed", "Recado alterado"))
+      wa.undoAbout = null
+      wa.setMyAboutLocal(ev.about || "")
       break
     case "qr":
       wa.qr = { rows: ev.rows || [], code: ev.code || "" }
@@ -508,7 +557,7 @@ Item {
     case "profile": {
       var prev = wa.profiles[ev.chat] || {}
       var p = ev
-      if (prev.photo) p.photo = prev.photo
+      if (prev.photo !== undefined) p.photo = prev.photo
       wa.profiles[ev.chat] = p
       wa.profilesRev++
       break
@@ -578,6 +627,9 @@ Item {
       wa.unreadPreview(ev.chat, ev.msgs || [])
       break
     case "error":
+      if (ev.code === "set_name" && wa.undoName !== null && wa.me) { wa.me = Object.assign({}, wa.me, { name: wa.undoName }); wa.undoName = null }
+      if (ev.code === "set_about" && wa.undoAbout !== null) { wa.setMyAboutLocal(wa.undoAbout); wa.undoAbout = null }
+      if (ev.code === "set_photo") wa.photoBusy = false
       if (ev.code === "pair_phone" || ev.code === "pair_phone_number") wa.pairError = L.error(ev.code, wa.app.lang)
       wa.failed(L.error(ev.code, wa.app.lang) + (ev.text && ev.code !== "pair_phone_number" ? "" : ""))
       if (ev.text) console.warn("whatsapp-claude:", ev.code, ev.text)

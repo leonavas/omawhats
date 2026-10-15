@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "../lib/Util.js" as U
 import "../lib/Labels.js" as L
+import "../lib/Emoji.js" as Emoji
 import "../lib/Registry.js" as Reg
 
 // The message box, as WhatsApp Web's: the + (documents, photos and videos,
@@ -50,6 +51,8 @@ Item {
     input.cursorPosition = input.length
     box._loading = false
     box.mentionNames = ({})
+    box.emojiAt = -1
+    box.emojiDismissed = -1
     panel.visible = false
   }
   Timer { id: draftSave; interval: 700; property string chat: ""; property string text: ""; onTriggered: box.app.setDraft(chat, text) }
@@ -111,6 +114,40 @@ Item {
     return text
   }
 
+  // ------------------------------------------------------------ emoji by name
+  // ":cora" (a colon and two letters or more) offers the emoji whose names
+  // have them in a strip over the box, as WhatsApp Web's. Once open it goes
+  // on over single spaces (":cora verde") while it still finds some.
+  property string emojiQuery: ""
+  property int emojiAt: -1
+  property int emojiDismissed: -1
+  property int emojiIndex: 0
+  readonly property var emojiMatches: {
+    if (box.emojiAt < 0) return []
+    return Emoji.search(box.emojiQuery, 40, box.app.lang, panel.recent)
+  }
+  onEmojiQueryChanged: box.emojiIndex = 0
+  onEmojiIndexChanged: stripList.positionViewAtIndex(box.emojiIndex, ListView.Contain)
+  function checkEmoji() {
+    var tk = Emoji.token(input.text.slice(0, input.cursorPosition), box.emojiAt, box.app.lang)
+    var at = tk ? tk.at : -1
+    if (tk && tk.end) box.emojiDismissed = at
+    else if (at !== box.emojiDismissed) box.emojiDismissed = -1
+    if (at < 0 || at === box.emojiDismissed) { box.emojiAt = -1; return }
+    box.emojiQuery = tk.query
+    box.emojiAt = at
+  }
+  function pickEmoji(g) {
+    var start = box.emojiAt
+    var end = input.cursorPosition
+    box.emojiAt = -1
+    input.remove(start, end)
+    input.insert(start, g)
+    input.cursorPosition = start + g.length
+    panel.remember(g)
+    input.forceActiveFocus()
+  }
+
   // ------------------------------------------------------------ send
   function send() {
     var text = input.text.trim()
@@ -164,9 +201,9 @@ Item {
 
   function attach(kind) {
     var tr = box.app.tr
-    var filter = kind === "media" ? tr("Photos and videos", "Fotos e vídeos") + " | *.jpg *.jpeg *.png *.webp *.gif *.mp4 *.mov *.m4v *.3gp *.webm *.mkv"
-               : kind === "audio" ? tr("Audio", "Áudio") + " | *.mp3 *.m4a *.ogg *.opus *.aac *.wav *.flac *.amr" : ""
-    box.app.pickFiles(kind === "document" ? tr("Send documents", "Enviar documentos") : kind === "audio" ? tr("Send audio", "Enviar áudio") : tr("Send photos and videos", "Enviar fotos e vídeos"),
+    var filter = kind === "media" ? tr("Photos and videos", "Fotos e vídeos") + " (*.jpg *.jpeg *.png *.webp *.gif *.mp4 *.mov *.m4v *.3gp *.webm *.mkv)"
+               : kind === "audio" ? tr("Audio", "Áudio") + " (*.mp3 *.m4a *.ogg *.opus *.aac *.wav *.flac *.amr)" : ""
+    box.win.pickFiles(kind === "document" ? tr("Send documents", "Enviar documentos") : kind === "audio" ? tr("Send audio", "Enviar áudio") : tr("Send photos and videos", "Enviar fotos e vídeos"),
                       filter, function(files) {
       box.win.dialog("sendFiles", { chat: box.chat, files: files, asDocument: kind === "document", asAudio: kind === "audio", reply: box.replyTo ? box.replyTo.id : "" })
       if (box.view) box.view.replyTo = null
@@ -374,8 +411,8 @@ Item {
         selectionColor: box.t.alpha(box.t.accent, 0.4)
         selectedTextColor: box.t.textBright
         onCursorRectangleChanged: scroller.ensureVisible(cursorRectangle)
-        onTextChanged: { box.typed(); box.checkMention() }
-        onCursorPositionChanged: box.checkMention()
+        onTextChanged: { box.typed(); box.checkMention(); box.checkEmoji() }
+        onCursorPositionChanged: { box.checkMention(); box.checkEmoji() }
 
         Text {
           visible: input.length === 0 && !input.preeditText
@@ -389,6 +426,17 @@ Item {
 
         Keys.onPressed: event => {
           var ctrl = event.modifiers & Qt.ControlModifier, shift = event.modifiers & Qt.ShiftModifier
+          if (strip.visible) {
+            var plain = !(event.modifiers & (Qt.ShiftModifier | Qt.ControlModifier | Qt.AltModifier))
+            if (plain && event.key === Qt.Key_Left) { box.emojiIndex = Math.max(0, box.emojiIndex - 1); event.accepted = true; return }
+            if (plain && event.key === Qt.Key_Right) { box.emojiIndex = Math.min(box.emojiMatches.length - 1, box.emojiIndex + 1); event.accepted = true; return }
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Tab) {
+              box.pickEmoji(box.emojiMatches[Math.min(box.emojiIndex, box.emojiMatches.length - 1)])
+              event.accepted = true
+              return
+            }
+            if (event.key === Qt.Key_Escape) { box.emojiDismissed = box.emojiAt; box.emojiAt = -1; event.accepted = true; return }
+          }
           if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
             if (box.mentionAt >= 0 && box.mentionMatches.length) { box.pickMention(box.mentionMatches[0]); event.accepted = true; return }
             if (box.app.enterSends ? !shift : ctrl) { box.send(); event.accepted = true }
@@ -485,6 +533,89 @@ Item {
         }
       }
       Tip { text: box.recording ? box.app.tr("Send", "Enviar") : box.hasText ? box.app.tr("Send", "Enviar") : box.app.tr("Voice message", "Mensagem de voz"); shown: sma.containsMouse; placement: "above" }
+    }
+  }
+
+  // ------------------------------------------------------------ emoji strip
+  // Floats over the conversation, above the box, from where the text starts.
+  Item {
+    id: strip
+    z: 10
+    visible: box.emojiAt >= 0 && box.mentionAt < 0 && box.emojiMatches.length > 0 && input.activeFocus && !box.recording
+    readonly property real cell: box.t.sp(60)
+    readonly property real pad: box.t.sp(10)
+    x: pill.x + scroller.x
+    y: (panel.visible ? 0 : (top.height > 0 ? top.y : pill.y + box.t.sp(4))) - height
+    width: Math.min(box.emojiMatches.length * cell + pad * 2, box.width - x - box.t.sp(16))
+    height: box.t.sp(80)
+
+    // A soft shadow, then the card.
+    Rectangle {
+      anchors.fill: parent
+      anchors.topMargin: box.t.sp(3)
+      anchors.leftMargin: -box.t.sp(1)
+      anchors.rightMargin: -box.t.sp(1)
+      anchors.bottomMargin: -box.t.sp(5)
+      radius: box.t.sp(14)
+      color: Qt.rgba(0, 0, 0, box.t.dark ? 0.35 : 0.14)
+    }
+    Rectangle {
+      anchors.fill: parent
+      radius: box.t.sp(12)
+      color: box.t.popup
+      border.width: 1
+      border.color: box.t.line
+    }
+
+    ListView {
+      id: stripList
+      x: strip.pad
+      y: box.t.sp(8)
+      width: parent.width - strip.pad * 2
+      height: box.t.sp(56)
+      orientation: ListView.Horizontal
+      clip: true
+      boundsBehavior: Flickable.StopAtBounds
+      model: box.emojiMatches
+      delegate: Item {
+        id: cellItem
+        required property var modelData
+        required property int index
+        readonly property bool on: index === box.emojiIndex
+        width: strip.cell
+        height: stripList.height
+        Rectangle {
+          anchors.centerIn: parent
+          width: box.t.sp(52); height: width
+          radius: box.t.sp(10)
+          color: cellItem.on ? box.t.selected : "transparent"
+          border.width: cellItem.on ? box.t.sp(2) : 0
+          border.color: box.t.accent
+        }
+        Text {
+          anchors.centerIn: parent
+          text: cellItem.modelData
+          font.family: box.t.emojiFont
+          font.pixelSize: box.t.sp(32)
+        }
+        MouseArea {
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onEntered: box.emojiIndex = cellItem.index
+          onClicked: box.pickEmoji(cellItem.modelData)
+        }
+      }
+    }
+    // The thin bar under it when there are more than fit.
+    Rectangle {
+      visible: stripList.visibleArea.widthRatio < 1
+      x: stripList.x + stripList.visibleArea.xPosition * stripList.width
+      y: stripList.y + stripList.height + box.t.sp(6)
+      width: stripList.visibleArea.widthRatio * stripList.width
+      height: box.t.sp(4)
+      radius: height / 2
+      color: box.t.alpha(box.t.fg, 0.3)
     }
   }
 }

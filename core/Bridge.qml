@@ -82,6 +82,13 @@ Item {
     }
   }
 
+  // The binding on `running` is gone after a restart sets it: follow
+  // `enabled` by hand too (WhatsApp quit from the bar, started again).
+  onEnabledChanged: {
+    if (!root.enabled) { restartTimer.stop(); if (proc.running) proc.running = false }
+    else if (!proc.running && root.dataDir !== "" && root.cacheDir !== "") proc.running = true
+  }
+
   Timer {
     id: restartTimer
     onTriggered: if (root.enabled && !proc.running && root.build !== "failed") proc.running = true

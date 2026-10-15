@@ -315,7 +315,10 @@ func (b *Bridge) meInfo() map[string]any {
 	if b.cli.Store.ID == nil {
 		return nil
 	}
-	return map[string]any{"jid": b.me().String(), "phone": b.me().User, "name": b.cli.Store.PushName, "lid": b.cli.Store.GetLID().ToNonAD().String()}
+	// A business account's name is its business name, which only the phone
+	// changes (WhatsApp Web Business shows it read-only).
+	return map[string]any{"jid": b.me().String(), "phone": b.me().User, "name": b.cli.Store.PushName, "lid": b.cli.Store.GetLID().ToNonAD().String(),
+		"business": b.cli.Store.BusinessName != "", "businessName": b.cli.Store.BusinessName}
 }
 
 func (b *Bridge) commands() {
@@ -369,6 +372,12 @@ func (b *Bridge) commands() {
 			}()
 		case "profile":
 			go b.profile(c.Chat)
+		case "set_name":
+			go b.setName(c.Text)
+		case "set_about":
+			go b.setAbout(c.Text)
+		case "set_photo":
+			go b.setPhoto(c.Text)
 		case "avatar":
 			select {
 			case b.avatars <- avatarReq{jid: c.Chat}:

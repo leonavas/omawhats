@@ -238,7 +238,7 @@ func (b *Bridge) profile(chat string) {
 			logf("user info %s: %v", jid, err)
 		} else {
 			for _, u := range info {
-				p["about"] = u.Status
+				p["about"] = b.aboutOf(ctx, jid, u.Status)
 				if u.VerifiedName != nil {
 					verified = u.VerifiedName.Details.GetVerifiedName()
 				}
