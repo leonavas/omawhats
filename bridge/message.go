@@ -157,6 +157,9 @@ func (b *Bridge) message(e *events.Message, status int) *Msg {
 	if !ok {
 		return nil
 	}
+	if c.Kind == "call" {
+		return b.callMessage(e, c)
+	}
 	// A view-once photo, video or voice can't be opened here, as on WhatsApp Web.
 	viewOnce := e.IsViewOnce
 	if viewOnce {
@@ -416,6 +419,10 @@ func (b *Bridge) historySync(e *events.HistorySync) {
 			emit(map[string]any{"t": "refresh", "chat": chat.String(), "older": true})
 		}
 	}
+	// The phone's call log: each call in its chat.
+	for _, r := range e.Data.GetCallLogRecords() {
+		b.callRecord(r)
+	}
 	if !onDemand {
 		emit(map[string]any{"t": "sync", "progress": e.Data.GetProgress(), "type": strings.ToLower(e.Data.GetSyncType().String())})
 	}
@@ -450,6 +457,10 @@ func (b *Bridge) historyMessage(jid, chat types.JID, web *waWeb.WebMessageInfo) 
 		sender := chat
 		if !actor.IsEmpty() {
 			sender = b.norm(actor)
+		}
+		if call, ok := c.X["call"].(Call); ok {
+			b.putCall(chat, "", web.GetKey().GetID(), int64(web.GetMessageTimestamp()), web.GetKey().GetFromMe(), sender, call)
+			return
 		}
 		x := xJSON(chat.String(), web.GetKey().GetID(), c)
 		b.db.Exec(`INSERT INTO messages (chat, id, sender, push_name, from_me, ts, kind, x, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 3)

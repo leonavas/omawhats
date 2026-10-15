@@ -32,7 +32,8 @@ Row {
     anchors.verticalCenter: parent.verticalCenter
   }
   Ticks {
-    visible: mc.m.from_me && mc.m.kind !== "revoked"
+    // A call has none, as on WhatsApp.
+    visible: mc.m.from_me && mc.m.kind !== "revoked" && mc.m.kind !== "call"
     app: mc.app
     status: mc.m.status
     base: mc.ink

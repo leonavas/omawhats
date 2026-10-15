@@ -495,6 +495,8 @@ func (b *Bridge) handle(raw any) {
 		}
 	case *events.Receipt:
 		b.receipt(e)
+	case *events.CallOffer, *events.CallOfferNotice, *events.CallAccept, *events.CallReject, *events.CallTerminate:
+		b.callEvent(raw)
 	case *events.MediaRetry:
 		go b.mediaRetry(e)
 	case *events.ChatPresence:

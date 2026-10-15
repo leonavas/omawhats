@@ -402,7 +402,8 @@ Item {
   // A message as the notification's body: its text as markup, media by
   // their emoji and label.
   readonly property var _kindEmoji: ({ camera: "📷", video: "🎥", ptv: "🎥", gif: "🎞️", mic: "🎤", headphones: "🎧", document: "📄",
-                                       sticker: "🏷️", location: "📍", liveLocation: "📍", contact: "👤", poll: "📊", event: "📅" })
+                                       sticker: "🏷️", location: "📍", liveLocation: "📍", contact: "👤", poll: "📊", event: "📅",
+                                       call: "📞", callMissed: "📞" })
   function noticeBody(m) {
     var s = L.short(m, root.lang)
     var text = F.styled(s.text, m.mentions, root.tr("You", "Você"))

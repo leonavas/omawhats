@@ -38,7 +38,7 @@ Item {
   readonly property bool group: row.group
   readonly property bool showName: group && !mine && row.first && !bare
   readonly property color bg: mine ? t.bubbleOut : t.bubbleIn
-  readonly property bool canReact: ["revoked", "placeholder", "system", "unsupported"].indexOf(kind) < 0
+  readonly property bool canReact: ["revoked", "placeholder", "system", "unsupported", "call"].indexOf(kind) < 0
   readonly property real padX: visual ? t.sp(3) : t.sp(8)
   readonly property real padTop: visual && !showName && !m.fwd && !m.quote ? t.sp(3) : t.sp(6)
   readonly property real padBottom: visual && metaOver ? t.sp(3) : t.sp(8)
@@ -587,28 +587,48 @@ Item {
     }
   }
 
+  // A call: its icon in a circle, what it was, and how it went or how long
+  // it lasted; a missed one in red, as WhatsApp does.
   Component {
     id: callC
     Row {
+      id: callRow
       readonly property var s: L.short(b.m, b.app.lang)
+      readonly property string note: L.callNote(b.m, b.app.lang)
+      readonly property real side: b.t.sp(40)
       spacing: b.t.sp(12)
-      topPadding: b.t.sp(2)
-      bottomPadding: b.t.sp(10)
-      property real natural: b.t.sp(240)
+      topPadding: b.t.sp(4)
+      bottomPadding: b.t.sp(4)
+      property real natural: Math.min(b.innerMax, Math.max(b.t.sp(240), side + spacing + Math.max(callTitle.implicitWidth, callNote.implicitWidth) + b.t.sp(8)))
       Rectangle {
-        width: b.t.sp(40); height: width; radius: width / 2
-        color: b.t.alpha(parent.s.danger ? b.t.danger : b.t.fg, 0.12)
-        Icon { anchors.centerIn: parent; name: parent.parent.s.icon; size: b.t.sp(22); color: parent.parent.s.danger ? b.t.danger : b.t.icon }
+        width: callRow.side; height: width; radius: width / 2
+        color: b.t.alpha(callRow.s.danger ? b.t.danger : b.t.fg, 0.12)
+        Icon { anchors.centerIn: parent; name: callRow.s.icon; size: b.t.sp(22); color: callRow.s.danger ? b.t.danger : b.t.icon }
       }
       Column {
         anchors.verticalCenter: parent.verticalCenter
-        Text { textFormat: Text.PlainText; text: parent.parent.s.text; color: b.t.text; font.family: b.t.font; font.pixelSize: b.t.fsMsg }
+        width: callRow.width - callRow.side - callRow.spacing
+        spacing: b.t.sp(1)
         Text {
+          id: callTitle
           textFormat: Text.PlainText
-          readonly property var c: b.x_.call || {}
-          visible: !!c.secs
-          text: U.duration(c.secs || 0)
-          color: b.t.dim; font.family: b.t.font; font.pixelSize: b.t.fsSmall
+          width: parent.width
+          text: L.callTitle(b.x_.call || {}, b.app.lang)
+          color: b.t.textBright
+          font.family: b.t.font
+          font.pixelSize: b.t.fsMsg
+          elide: Text.ElideRight
+        }
+        Text {
+          id: callNote
+          textFormat: Text.PlainText
+          visible: callRow.note !== ""
+          width: parent.width
+          text: callRow.note
+          color: callRow.s.danger ? b.t.danger : b.t.dim
+          font.family: b.t.font
+          font.pixelSize: b.t.fsSmall + 0.5
+          elide: Text.ElideRight
         }
       }
     }
