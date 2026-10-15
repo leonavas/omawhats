@@ -30,7 +30,7 @@ Item {
   readonly property var media: m.media || null
   readonly property bool sticker: kind === "sticker"
   readonly property bool jumbo: row.jumbo > 0
-  readonly property bool bare: sticker || jumbo
+  readonly property bool bare: sticker
   readonly property bool visual: kind === "image" || kind === "video" || kind === "gif" || kind === "ptv" || (kind === "card" && !!media && media.kind !== "document")
   readonly property bool showText: m.text !== undefined && m.text !== "" && kind !== "poll" && kind !== "event" && kind !== "system"
   readonly property bool metaOver: visual && !showText && !m.card
@@ -57,20 +57,20 @@ Item {
     w = Math.max(w, nat(linkLoader.item))
     w = Math.max(w, nat(textLoader.item))
     w = Math.max(w, nat(cardLoader.item))
-    if (!textLoader.item || metaOver) w = Math.max(w, meta.implicitWidth + (partLoader.item && !visual ? 0 : 0))
+    if (!textLoader.item || metaOver || jumbo) w = Math.max(w, meta.implicitWidth + (partLoader.item && !visual ? 0 : 0))
     return w
   }
   readonly property real inner: Math.min(innerMax, Math.max(natural, t.sp(40)))
 
-  width: bare ? Math.max(jumbo ? jumboText.width : (partLoader.item ? partLoader.item.width : 0), metaPill.width) : inner + padX * 2
-  height: bare ? (jumbo ? jumboText.height : col.height) + metaPill.height + t.sp(4)
+  width: bare ? Math.max(partLoader.item ? partLoader.item.width : 0, metaPill.width) : inner + padX * 2
+  height: bare ? col.height + metaPill.height + t.sp(4)
                : col.height + padTop + padBottom + (metaRowNeeded ? meta.height : 0)
 
   // A part with no text under it (a document, a place) keeps a line of its
   // own for the time; a voice note has it inside; a deleted one beside it.
   readonly property bool inlineMeta: kind === "ptt" || kind === "audio"
   readonly property bool sideMeta: kind === "revoked" || kind === "placeholder"
-  readonly property bool metaRowNeeded: !bare && !metaOver && !textLoader.item && !inlineMeta && !sideMeta
+  readonly property bool metaRowNeeded: !bare && !metaOver && (!textLoader.item || jumbo) && !inlineMeta && !sideMeta
 
   // ------------------------------------------------------------ the bubble
   Rectangle {
@@ -108,7 +108,6 @@ Item {
   // ------------------------------------------------------------ the parts
   Column {
     id: col
-    visible: !b.jumbo
     x: b.bare ? 0 : b.padX
     y: b.bare ? 0 : b.padTop
     width: b.bare ? b.width : b.inner
@@ -174,7 +173,7 @@ Item {
 
     Loader {
       id: partLoader
-      active: b.kind !== "text" || b.jumbo
+      active: b.kind !== "text"
       width: b.bare ? undefined : parent.width
       sourceComponent: {
         switch (b.kind) {
@@ -204,9 +203,9 @@ Item {
 
     Loader {
       id: textLoader
-      active: b.showText && !b.jumbo
+      active: b.showText
       width: parent.width
-      sourceComponent: textC
+      sourceComponent: b.jumbo ? jumboC : textC
     }
 
     Loader {
@@ -217,16 +216,18 @@ Item {
     }
   }
 
-  // Messages of one to three emoji: large, no bubble.
-  Text {
-    id: jumboText
-    textFormat: Text.PlainText
-    visible: b.jumbo
-    text: b.m.text || ""
-    font.family: b.t.emojiFont
-    font.pixelSize: b.row.jumbo === 1 ? b.t.sp(50) : b.row.jumbo === 2 ? b.t.sp(42) : b.t.sp(36)
-    x: b.mine ? b.width - width : 0
-    y: 0
+  // Messages of one to three emoji: larger, in their bubble, the time on a
+  // line of its own, as WhatsApp Web's.
+  Component {
+    id: jumboC
+    Text {
+      textFormat: Text.PlainText
+      text: b.m.text || ""
+      font.family: b.t.emojiFont
+      font.pixelSize: b.row.jumbo === 1 ? b.t.sp(36) : b.row.jumbo === 2 ? b.t.sp(32) : b.t.sp(28)
+      horizontalAlignment: Text.AlignHCenter
+      topPadding: b.t.sp(2)
+    }
   }
 
   // ------------------------------------------------------------ the time
