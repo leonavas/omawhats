@@ -256,6 +256,9 @@ func (b *Bridge) profile(chat string) {
 			}
 		}
 		if verified == "" {
+			verified = b.bizName(pn)
+		}
+		if verified == "" {
 			verified = c.BusinessName
 		}
 		if verified == "" && jid.Server == types.DefaultUserServer {
@@ -263,12 +266,11 @@ func (b *Bridge) profile(chat string) {
 				verified = r[0].VerifiedName.Details.GetVerifiedName()
 			}
 		}
-		// The verified name, then what you saved, then what they set.
-		for _, n := range []string{verified, c.FullName, c.FirstName} {
-			if n != "" {
-				p["name"] = n
-				break
-			}
+		// Kept on the chat, for its row and header.
+		b.setBizName(chat, verified)
+		// As the chat list has it: what you saved, then the verified name.
+		if n := personName(c, verified); n != "" {
+			p["name"] = n
 		}
 		if pn.Server == types.DefaultUserServer {
 			p["phone"] = pn.User

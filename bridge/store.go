@@ -38,7 +38,10 @@ CREATE TABLE IF NOT EXISTS chats (
 	cleared INTEGER NOT NULL DEFAULT 0,
 	-- A business's verified_level ("high" gets the check), "none" when it
 	-- has none; empty until asked.
-	verified TEXT NOT NULL DEFAULT ''
+	verified TEXT NOT NULL DEFAULT '',
+	-- A business's verified name, which WhatsApp Web shows in place of the
+	-- number; empty for people, and until it's known.
+	biz_name TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS messages (
 	chat TEXT NOT NULL,
@@ -110,6 +113,7 @@ CREATE TABLE IF NOT EXISTS meta (
 func migrate(db *sql.DB) {
 	for _, col := range []string{
 		`messages ADD COLUMN starred INTEGER NOT NULL DEFAULT 0`,
+		`chats ADD COLUMN biz_name TEXT NOT NULL DEFAULT ''`,
 	} {
 		db.Exec(`ALTER TABLE ` + col)
 	}
@@ -130,8 +134,14 @@ func migrate(db *sql.DB) {
 // ---------------------------------------------------------------- names
 
 // savedName is the name you gave someone (or their business's), "" when none.
-func savedName(c types.ContactInfo) string {
-	for _, n := range []string{c.FullName, c.FirstName, c.BusinessName} {
+func savedName(c types.ContactInfo) string { return personName(c, "") }
+
+// personName is what WhatsApp Web calls someone, in its order: the name you
+// saved, the business's verified name (biz, as its chat keeps it), the
+// business name whatsmeow has; "" when none, for the push name (where a
+// group shows it) or the number to stand in.
+func personName(c types.ContactInfo, biz string) string {
+	for _, n := range []string{c.FullName, c.FirstName, biz, c.BusinessName} {
 		if n != "" {
 			return n
 		}
@@ -139,21 +149,35 @@ func savedName(c types.ContactInfo) string {
 	return ""
 }
 
+// bizName is the verified name a chat keeps for its business, "" when none.
+func (b *Bridge) bizName(j types.JID) string {
+	var n string
+	b.db.QueryRow(`SELECT biz_name FROM chats WHERE jid = ?`, j.String()).Scan(&n)
+	return n
+}
+
 func (b *Bridge) contact(j types.JID) types.ContactInfo {
 	if !b.stored() {
 		return types.ContactInfo{}
 	}
 	c, err := b.cli.Store.Contacts.GetContact(b.ctx, j)
-	if err == nil && c.Found {
+	if err == nil && c.Found && savedName(c) != "" {
 		return c
 	}
-	// A number WhatsApp also knows by a hidden id: the contact may be under it.
+	// A number WhatsApp also knows by a hidden id: the contact may be under
+	// it, or its names only (a business's comes with the id it writes from).
 	if j.Server == types.DefaultUserServer {
 		if lid, err := b.cli.Store.LIDs.GetLIDForPN(b.ctx, j); err == nil && !lid.IsEmpty() {
-			if c, err := b.cli.Store.Contacts.GetContact(b.ctx, lid); err == nil && c.Found {
-				return c
+			if lc, err := b.cli.Store.Contacts.GetContact(b.ctx, lid); err == nil && lc.Found && (savedName(lc) != "" || !c.Found) {
+				if lc.PushName == "" {
+					lc.PushName = c.PushName
+				}
+				return lc
 			}
 		}
+	}
+	if err == nil && c.Found {
+		return c
 	}
 	return types.ContactInfo{}
 }
@@ -161,14 +185,14 @@ func (b *Bridge) contact(j types.JID) types.ContactInfo {
 func (b *Bridge) contactName(j types.JID) string { return savedName(b.contact(j)) }
 
 // senderName is who wrote a message, as a group shows them: "" for you,
-// the saved name, "~push name" for people you haven't saved, else the
-// number (with its +).
+// the saved name or the business's, "~push name" for people you haven't
+// saved, else the number (with its +).
 func (b *Bridge) senderName(j types.JID, push string) string {
 	if j.User == b.me().User || (b.stored() && j.User == b.cli.Store.GetLID().User) {
 		return ""
 	}
 	c := b.contact(j)
-	if n := savedName(c); n != "" {
+	if n := personName(c, b.bizName(j)); n != "" {
 		return n
 	}
 	if push == "" {
@@ -269,7 +293,7 @@ func (b *Bridge) sendChats() {
 // groups we're in and the contacts we know stay out until someone writes.
 func (b *Bridge) chats() []Chat {
 	// Cleared ones stay, empty, as on the phone.
-	rows, err := b.db.Query(`SELECT c.jid, c.name, c.last_ts, c.unread, c.marked, c.pinned, c.archived, c.mute_until, c.read_only, c.favorite, c.verified,
+	rows, err := b.db.Query(`SELECT c.jid, c.name, c.last_ts, c.unread, c.marked, c.pinned, c.archived, c.mute_until, c.read_only, c.favorite, c.verified, c.biz_name,
 		COALESCE(m.id, ''), COALESCE(m.kind, ''), COALESCE(m.text, ''), COALESCE(m.x, ''), COALESCE(m.from_me, 0), COALESCE(m.status, 0),
 		COALESCE(m.sender, ''), COALESCE(m.push_name, ''), COALESCE(md.seconds, 0), COALESCE(md.proto, X'')
 		FROM chats c
@@ -293,12 +317,12 @@ func (b *Bridge) chats() []Chat {
 	names := map[string]string{}
 	for rows.Next() {
 		var c Chat
-		var level, groupName, id, kind, text, x, sender, push string
+		var level, groupName, bizName, id, kind, text, x, sender, push string
 		var fromMe bool
 		var status int
 		var secs uint32
 		var blob []byte
-		if rows.Scan(&c.JID, &groupName, &c.TS, &c.Unread, &c.Marked, &c.Pin, &c.Archived, &c.Mute, &c.ReadOnly, &c.Favorite, &level,
+		if rows.Scan(&c.JID, &groupName, &c.TS, &c.Unread, &c.Marked, &c.Pin, &c.Archived, &c.Mute, &c.ReadOnly, &c.Favorite, &level, &bizName,
 			&id, &kind, &text, &x, &fromMe, &status, &sender, &push, &secs, &blob) != nil {
 			continue
 		}
@@ -317,7 +341,9 @@ func (b *Bridge) chats() []Chat {
 			if !ok || savedName(info) == "" {
 				info = b.contact(jid)
 			}
-			c.Name = savedName(info)
+			// The saved name, the business's; else what the phone's history
+			// called the chat, else the number (the app's to write).
+			c.Name = personName(info, bizName)
 			if c.Name == "" {
 				c.Name = groupName
 			}

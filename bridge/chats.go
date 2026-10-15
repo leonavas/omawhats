@@ -26,10 +26,6 @@ const muteForever int64 = -1
 // WhatsApp lets no more than this many chats be pinned.
 const maxPinned = 3
 
-
-
-
-
 // lastKey is the chat's newest message, as the ranges in archive, read,
 // clear and delete patches carry it; zero and nil when it has none.
 func (b *Bridge) lastKey(chat string) (time.Time, *waCommon.MessageKey) {
@@ -135,39 +131,6 @@ func (b *Bridge) resyncOnce() {
 		}
 	}
 	b.setMeta("resynced", "1")
-	b.dirty.Store(true)
-}
-
-// bizNamesOnce asks WhatsApp, once per account, about the people chats
-// that have no name here: businesses answer with their verified name (kept
-// in the contact store), which WhatsApp Web shows in place of the number.
-// History syncs and new messages bring it from then on.
-func (b *Bridge) bizNamesOnce() {
-	if b.meta("biznames") != "" {
-		return
-	}
-	rows, err := b.db.Query(`SELECT jid FROM chats WHERE name = '' AND jid LIKE '%@s.whatsapp.net'`)
-	if err != nil {
-		return
-	}
-	var jids []types.JID
-	for rows.Next() {
-		var s string
-		if rows.Scan(&s) == nil {
-			if j, err := types.ParseJID(s); err == nil && j.User != b.me().User && b.contactName(j) == "" {
-				jids = append(jids, j)
-			}
-		}
-	}
-	rows.Close()
-	// GetUserInfo keeps the verified names it gets in the contact store.
-	for i := 0; i < len(jids); i += 50 {
-		if _, err := b.cli.GetUserInfo(b.ctx, jids[i:min(i+50, len(jids))]); err != nil {
-			logf("business names: %v", err)
-			return
-		}
-	}
-	b.setMeta("biznames", "1")
 	b.dirty.Store(true)
 }
 
