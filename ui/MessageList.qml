@@ -86,17 +86,32 @@ Item {
       return
     }
     var n = h.msgs.length
-    if (n > root._prevCount && root._prevAtBottom) list.positionViewAtBeginning()
-    else if (n > root._prevCount && !root._prevAtBottom) {
-      var last = h.msgs[n - 1]
-      if (last && !last.from_me) root.newBelow += n - root._prevCount
-      if (last && last.from_me) list.positionViewAtBeginning()
-    }
+    var mine = n > root._prevCount && h.msgs[n - 1] && h.msgs[n - 1].from_me
+    if (n > root._prevCount && (root._prevAtBottom || mine)) root.toBottom(mine)
+    else if (n > root._prevCount) root.newBelow += n - root._prevCount
     root._prevCount = n
     root.tryJump()
   }
+  // All the way down, past the list's bottom margin too (positioning at the
+  // newest leaves that out). After you send, for a moment, it stays there
+  // as the bubble and the box settle: its ticks, a link's preview, a photo's
+  // size, the message box going back to one line.
+  property double _followUntil: 0
+  function toBottom(follow) {
+    list.positionViewAtBeginning()
+    Qt.callLater(root.pinBottom)
+    if (follow) root._followUntil = Date.now() + 2000
+  }
+  function pinBottom() {
+    list.contentY = Math.max(list.originY - list.topMargin, list.originY + list.contentHeight + list.bottomMargin - list.height)
+  }
   Connections {
     target: list
+    function onContentHeightChanged() { if (Date.now() < root._followUntil) Qt.callLater(root.pinBottom) }
+    // The message box shrinking back after a long one.
+    function onHeightChanged() { if (Date.now() < root._followUntil) Qt.callLater(root.pinBottom) }
+    // Scrolling yourself lets it go.
+    function onMovementStarted() { root._followUntil = 0 }
     function onContentYChanged() {
       root._prevAtBottom = root.atBottom
       if (root.newestInView) root.newBelow = 0
