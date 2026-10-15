@@ -444,7 +444,7 @@ func (b *Bridge) handle(raw any) {
 		// server learns your name from it.
 		go b.setPresence(b.online.Load())
 		go b.syncGroups()
-		go b.resyncOnce()
+		go func() { b.resyncOnce(); b.callsOnce() }()
 		go b.stickersOnce()
 		b.wantBizNames()
 		select {

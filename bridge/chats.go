@@ -134,6 +134,23 @@ func (b *Bridge) resyncOnce() {
 	b.dirty.Store(true)
 }
 
+// callsOnce reads the app state once more, all of it, for the phone's call
+// log: before calls were kept here its entries were passed over, so the
+// calls from then come back this way (the rest of it is as it was).
+func (b *Bridge) callsOnce() {
+	if b.meta("calls") != "" {
+		return
+	}
+	for _, name := range []appstate.WAPatchName{appstate.WAPatchRegular, appstate.WAPatchRegularLow, appstate.WAPatchRegularHigh} {
+		if err := b.cli.FetchAppState(b.ctx, name, true, false); err != nil {
+			logf("app state calls %s: %v", name, err)
+			return
+		}
+	}
+	b.setMeta("calls", "1")
+	b.dirty.Store(true)
+}
+
 // unarchiveOnNews: with "Manter conversas arquivadas" off on the phone, a
 // new message brings an archived chat back to the list, as WhatsApp does.
 func (b *Bridge) unarchiveOnNews(chat string) {
