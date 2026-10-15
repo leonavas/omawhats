@@ -340,7 +340,8 @@ Item {
     if (editable && canSend) items.push({ label: tr("Edit", "Editar"), icon: "edit", action: function() { b.view.startEdit(m) } })
     items.push({ label: tr("Select", "Selecionar"), icon: "select", action: function() { b.view.toggleSelect(m) } })
     items.push({ separator: true })
-    items.push({ label: tr("Delete", "Apagar"), icon: "delete", danger: true, action: function() { b.win.dialog("deleteMsgs", { chat: m.chat, msgs: [m] }) } })
+    // Delete starts selecting, this one picked, as WhatsApp's.
+    items.push({ label: tr("Delete", "Apagar"), icon: "delete", danger: true, action: function() { b.view.toggleSelect(m) } })
     b.win.menuAt(anchor, items, dx, dy)
   }
 

@@ -29,8 +29,13 @@ Item {
     else s[m.id] = m
     conv.selectedRev++
     if (!conv.selecting) conv.selecting = true
+    conv.forceActiveFocus()
   }
   function endSelect() { conv.selecting = false; conv.selected = ({}); conv.selectedRev++ }
+  // The message box goes away while selecting: Esc here leaves it, or, when
+  // not selecting, goes on to the window's (closing the chat).
+  onSelectingChanged: if (conv.selecting) conv.forceActiveFocus()
+  Keys.onEscapePressed: event => { if (conv.selecting) conv.endSelect(); else event.accepted = false }
 
   // The message you're answering, or editing.
   property var replyTo: null
@@ -259,7 +264,7 @@ Item {
         anchors.left: endBtn.right
         anchors.leftMargin: conv.t.sp(16)
         anchors.verticalCenter: parent.verticalCenter
-        text: conv.selectedCount === 1 ? conv.app.tr("1 selected", "1 selecionada") : conv.app.tr(conv.selectedCount + " selected", conv.selectedCount + " selecionadas")
+        text: conv.selectedCount === 1 ? conv.app.tr("1 selected", "1 selecionada") : conv.app.tr(conv.selectedCount + " selected", conv.selectedCount + " itens selecionados")
         color: conv.t.text
         font.family: conv.t.font
         font.pixelSize: conv.t.fsName
@@ -277,16 +282,16 @@ Item {
           onClicked: { var all = parent.msgs.every(function(m) { return m.star }); conv.wa.star(conv.chat, parent.msgs.map(function(m) { return m.id }), !all); conv.endSelect() }
         }
         IconButton {
-          icon: "delete"
-          tip: conv.app.tr("Delete", "Apagar")
-          enabledState: parent.msgs.length > 0
-          onClicked: conv.win.dialog("deleteMsgs", { chat: conv.chat, msgs: parent.msgs, done: conv.endSelect })
-        }
-        IconButton {
           icon: "forward"
           tip: conv.app.tr("Forward", "Encaminhar")
           enabledState: parent.msgs.length > 0
           onClicked: conv.win.dialog("forward", { chat: conv.chat, msgs: parent.msgs, done: conv.endSelect })
+        }
+        IconButton {
+          icon: "delete"
+          tip: conv.app.tr("Delete", "Apagar")
+          enabledState: parent.msgs.length > 0
+          onClicked: conv.win.dialog("deleteMsgs", { chat: conv.chat, msgs: parent.msgs, done: conv.endSelect })
         }
       }
     }

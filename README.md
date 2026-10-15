@@ -10,6 +10,13 @@ bar icon with unread badges, a hover preview and desktop notifications. It
 links to your phone as one more device through a small Go bridge on
 [whatsmeow](https://github.com/tulir/whatsmeow). No browser, no Electron.
 
+## From the author
+
+> This is the app I use every day, for both my personal and professional
+> life, so every little detail I see out of tune, expect a fix.
+>
+> — [leonavas](https://github.com/leonavas)
+
 ## Install
 
 ```sh

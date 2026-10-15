@@ -240,9 +240,14 @@ Item {
       }
 
       HoverHandler { id: hover }
-      TapHandler {
-        enabled: mi.selecting
-        onTapped: r.view.toggleSelect(mi.m)
+      // While selecting, a click anywhere on the row picks it or lets it go,
+      // over the bubble's own links, media and text.
+      MouseArea {
+        anchors.fill: parent
+        anchors.topMargin: mi.topGap - r.t.sp(2)
+        visible: mi.selecting
+        cursorShape: Qt.PointingHandCursor
+        onClicked: r.view.toggleSelect(mi.m)
       }
     }
   }

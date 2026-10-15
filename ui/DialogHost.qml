@@ -161,7 +161,7 @@ Item {
       readonly property var msgs: host.args.msgs || []
       // For everyone: only yours, sent less than about two days ago, not deleted yet.
       readonly property bool everyone: msgs.length > 0 && msgs.every(function(m) { return m.from_me && m.kind !== "revoked" && Date.now() / 1000 - m.ts < 60 * 60 * 48 && m.status >= 0 })
-      title: msgs.length > 1 ? host.app.tr("Delete " + msgs.length + " messages?", "Apagar " + msgs.length + " mensagens?") : host.app.tr("Delete message?", "Apagar mensagem?")
+      title: msgs.length > 1 ? host.app.tr("Delete messages?", "Deseja apagar as mensagens?") : host.app.tr("Delete message?", "Deseja apagar a mensagem?")
       cardWidth: host.t.sp(440)
       Column {
         width: parent.width
