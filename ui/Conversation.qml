@@ -1,5 +1,6 @@
 import QtQuick
 import "../lib/Util.js" as U
+import "../lib/Format.js" as F
 import "../lib/Labels.js" as L
 import "../lib/Registry.js" as Reg
 
@@ -18,7 +19,7 @@ Item {
   readonly property bool group: chat.indexOf("@g.us") > 0 || (!!c && c.kind === "group")
   readonly property var info: wa.profile(chat)
 
-  // Selecting messages (to delete, forward or star them together).
+  // Selecting messages (to copy, delete, forward or star them together).
   property bool selecting: false
   property var selected: ({})
   property int selectedRev: 0
@@ -36,6 +37,38 @@ Item {
   // not selecting, goes on to the window's (closing the chat).
   onSelectingChanged: if (conv.selecting) conv.forceActiveFocus()
   Keys.onEscapePressed: event => { if (conv.selecting) conv.endSelect(); else event.accepted = false }
+  Keys.onPressed: event => {
+    if (conv.selecting && event.key === Qt.Key_C && (event.modifiers & Qt.ControlModifier)) { conv.copySelected(); event.accepted = true }
+  }
+
+  // Copying them, as WhatsApp's: one message, its text alone; more, oldest
+  // first, each on its line as "[14:05, 03/10/2026] Ana: the text". What has
+  // no text (a photo, a voice note) stays out, a caption goes; with nothing
+  // to copy the clipboard keeps what it had.
+  function copySelected() {
+    var tr = conv.app.tr
+    var msgs = Object.keys(conv.selected).map(function(k) { return conv.selected[k] })
+                     .filter(function(m) { return F.plain(m.text, m.mentions) !== "" })
+                     .sort(function(a, b) { return a.ts - b.ts })
+    if (msgs.length === 0) { conv.win.toast(tr("No text to copy", "Nenhum texto para copiar")); return }
+    var text = msgs.length === 1 ? F.plain(msgs[0].text, msgs[0].mentions) : msgs.map(function(m) {
+      return "[" + U.clock(m.ts, conv.app.clock24) + ", " + U.shortDate(m.ts, conv.app.lang) + "] " + conv.senderOf(m) + ": " + F.plain(m.text, m.mentions)
+    }).join("\n")
+    conv.app.copy(text)
+    conv.win.toast(msgs.length === 1 ? tr("Message copied", "Mensagem copiada") : tr(msgs.length + " messages copied", msgs.length + " mensagens copiadas"))
+    conv.endSelect()
+  }
+  // Who sent it, by the name the chat shows: yours, the contact's, or in a
+  // group the sender's (the number when not saved).
+  function senderOf(m) {
+    if (m.from_me) {
+      var me = conv.wa.me
+      return (me && ((me.business && me.businessName) || me.name || U.phone(me.phone))) || conv.app.tr("You", "Você")
+    }
+    if (!conv.group) return conv.wa.chatName(conv.c) || conv.wa.nameOf(conv.chat)
+    var n = String(m.name || "")
+    return n === "" || n.indexOf("~") === 0 ? U.phone(String(m.sender).split("@")[0]) : n
+  }
 
   // The message you're answering, or editing.
   property var replyTo: null
@@ -275,6 +308,12 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: conv.t.sp(10)
         readonly property var msgs: { conv.selectedRev; var out = []; for (var k in conv.selected) out.push(conv.selected[k]); return out }
+        IconButton {
+          icon: "copy"
+          tip: conv.app.tr("Copy", "Copiar")
+          enabledState: parent.msgs.length > 0
+          onClicked: conv.copySelected()
+        }
         IconButton {
           icon: "star"
           tip: conv.app.tr("Star", "Favoritar")
