@@ -1,10 +1,14 @@
-# omawhats
+<p align="center">
+  <img src="preview.webp" alt="Omawhats: WhatsApp inside the Omarchy shell">
+</p>
 
-A whole WhatsApp client living inside the Omarchy shell, written as an Omarchy
-plugin (QML, with a small Go bridge on [whatsmeow](https://github.com/tulir/whatsmeow)
-for the network). The bar shows WhatsApp's mark with its badges; a click opens
-the window: WhatsApp Web's layout (rail, chat list, conversation, contact info)
-drawn in the current Omarchy theme's colors.
+# Omawhats
+
+WhatsApp inside the [Omarchy](https://omarchy.org) shell. A native QML window
+laid out like WhatsApp Web and drawn in your current theme's colors, plus a
+bar icon with unread badges, a hover preview and desktop notifications. It
+links to your phone as one more device through a small Go bridge on
+[whatsmeow](https://github.com/tulir/whatsmeow). No browser, no Electron.
 
 ## Install
 
@@ -12,7 +16,73 @@ drawn in the current Omarchy theme's colors.
 omarchy plugin add https://github.com/leonavas/omawhats --enable
 ```
 
-Or from a checkout of your own:
+Click the bar icon, then on your phone go to **WhatsApp → Linked devices →
+Link a device** and scan the QR code (or pick **Log in with phone number**).
+Your phone doesn't need to stay online afterwards.
+
+The first start builds the bridge with Go fetched through `mise`, which ships
+with Omarchy. It takes a minute or two, once per version. Everything else it
+uses (`mpv`, `ffmpeg`, `wl-clipboard`, `notify-send`, `xdg-open`,
+`omarchy-file-select`) comes with Omarchy too.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Conversation](docs/screenshots/conversation.webp) **Chats**: media, replies, voice notes, link previews, documents, reactions | ![Group](docs/screenshots/group.webp) **Groups**: mentions, polls, the unread band |
+| ![Contact info](docs/screenshots/info.webp) **Contact info**: about, groups in common, mute | ![Media](docs/screenshots/media.webp) **Shared media**, docs and links |
+| ![Emoji](docs/screenshots/emoji.webp) **Emoji and stickers** panel | ![Message menu](docs/screenshots/menu.webp) **Message actions** and quick reactions |
+| ![Settings](docs/screenshots/settings.webp) **Settings** | ![Account menu](docs/screenshots/account.webp) **Your menu** (Alt+S): profile, pause notifications, updates |
+| ![Bar preview](docs/screenshots/bar-preview.webp) **The bar**: badges and a preview of what's unread | ![Shortcuts](docs/screenshots/shortcuts.webp) **Keyboard-first** (Ctrl+/) |
+
+## Features
+
+- Chats with WhatsApp Web's filters (All, Unread, Favorites, Groups),
+  archived chats, pins, mutes, and search across chats and messages.
+- History synced from the phone; older messages load as you scroll.
+- Images, videos, GIFs, stickers, documents, voice notes (waveform, 1.5×/2×),
+  locations, contacts, polls and events.
+- Replies, reactions, edits, delete for everyone, forward, star; read
+  receipts, typing and online status.
+- A composer with formatting, emoji and stickers, attachments, pasted
+  images, voice recording, mentions and drafts.
+- Contact and group info, business profiles with opening hours, and your own
+  profile (name, about, photo).
+- English and Portuguese; zoom with Ctrl+= / Ctrl+-.
+
+## The bar
+
+- **Badges**: red for unread direct chats, blue for groups. Muted and
+  archived chats count in neither. "Group notifications" folds them into one.
+- **Hover** shows the unread chats with their newest messages; a click opens
+  the chat.
+- **Notifications** for new messages, except in muted chats, while paused, or
+  for the chat on screen. Pause them for 30 minutes up to a chosen date.
+- **Scratchpad parking**: the window lives in a special workspace (Omarchy's
+  scratchpad by default). A click shows it, another puts it away, and
+  WhatsApp keeps running.
+
+Left click shows or hides the window, middle click quits WhatsApp, right
+click opens the menu. Every option is in the widget's settings.
+
+## Updates
+
+Every six hours the app reads `manifest.json` on this repo's `main` branch
+(a plain `curl`, nothing of yours is sent). When there's a new version, a
+notice offers a one-click update (`omarchy plugin update`). Turn the check
+off in Settings.
+
+## Files
+
+- `~/.config/whatsapp-claude/settings.json`: settings and drafts.
+- `~/.local/share/whatsapp-claude/`: the session, the message store, avatars,
+  the built bridge and its log.
+- `~/.cache/whatsapp-claude/`: downloaded media.
+
+Log out from Settings (or unlink the device on your phone) to end the
+session. Your messages only travel between your machine and WhatsApp.
+
+## Development
 
 ```sh
 git clone https://github.com/leonavas/omawhats
@@ -21,106 +91,16 @@ omarchy-shell shell rescanPlugins
 omarchy plugin enable leonavas.whatsapp-claude --section right
 ```
 
-Requirements: nothing beyond what Omarchy ships. The first start builds the
-bridge with Go fetched through `mise` (a minute or two, once per version; no
-cgo, so no C compiler). Audio plays through `mpv`, voice notes are recorded
-with `ffmpeg`, and it uses `notify-send`, `wl-clipboard` and `xdg-open`.
+The shell caches plugin QML, so reload edits with `omarchy-restart-shell`.
+IPC: `omarchy-shell whatsapp-claude toggle` (also `show`, `hide`,
+`open <jid>`, `pause <minutes>`, `resume`, `status`).
 
-## Updates
-
-A little after start-up and every six hours, the app reads `manifest.json`
-on GitHub's `main` branch (plain `curl` to raw.githubusercontent.com, nothing
-of yours is sent). When its `version` is newer, a notice shows on top of the
-chat list, in the bar icon's preview and in its menu. A click runs
-`omarchy plugin update leonavas.whatsapp-claude --yes` and then
-`omarchy-restart-shell` (the shell's plugin reload keeps the old QML cached),
-and the window comes back saying how it went. A checkout of your own (the
-symlink above) is never touched: the click only says to `git pull`. Settings ›
-Check for updates turns the background checks off; set
-`WACLAUDE_UPDATE_DEV=1` (or `"updateDev": true` in
-`~/.config/whatsapp-claude/settings.json`) to see the notice without a new
-version.
-
-## Link your phone
-
-The window shows a QR code: on the phone, WhatsApp → Linked devices → Link a
-device. Or pick **Log in with phone number**, type your number and enter the
-code it shows on the phone. It appears there as "Omarchy", one more linked
-device next to WhatsApp Web; the phone doesn't need to stay online.
-
-Files:
-
-- `~/.config/whatsapp-claude/settings.json`: settings and drafts.
-- `~/.local/share/whatsapp-claude/`: the session (`session.db`), the message
-  store (`app.db`), avatars, the built bridge and its log.
-- `~/.cache/whatsapp-claude/`: downloaded media, stickers, pasted images,
-  recordings.
-
-Log out from Settings (or unlink it on the phone) to end the session.
-
-## What's there
-
-Chats with WhatsApp Web's filters (All, Unread, Favorites, Groups), archived
-chats, pins, mutes and search across chats and messages; history synced from
-the phone, with older messages fetched as you scroll; bubbles with their
-tails, day chips and the unread band; text with WhatsApp's formatting, links
-with previews and mentions; images, videos, GIFs, stickers, documents,
-voice notes (waveform, 1.5×/2× speed), locations, contacts, polls and events;
-replies, reactions, edits, delete for me or for everyone, forward, star; the
-composer with emoji and stickers, attachments, pasted images, voice recording,
-mentions and drafts; read receipts, typing and online status; contact and
-group info with shared media, docs and links; starred messages; new chat by
-contact or number; desktop notifications; keyboard shortcuts (Ctrl+/);
-English and Portuguese; zoom (Ctrl+= / Ctrl+-).
-
-## The bar
-
-- **Icon.** WhatsApp's mark, Mono by default (Outline, Color or a glyph in
-  the settings).
-- **Badges.** Red at the bottom-right counts unread direct chats, blue at the
-  top-right unread groups; muted and archived chats count in neither.
-  "Group notifications" folds both into one badge.
-- **Hover preview.** The unread chats with their newest messages. A click
-  opens the chat.
-- **Notifications.** One per new message (the author · the group, in a
-  group), with the chat's picture; none for muted chats, while paused, or
-  for the chat open on screen. A click opens the chat at that message.
-- **Pause notifications** for 30 minutes, 1 hour, 2 hours, until tomorrow or
-  until a date and time.
-- **Launch on Login / Quit.** WhatsApp starts with the shell (or on the first
-  click) and "Quit WhatsApp" stops it: no badges, no notifications.
-- **Scratchpad parking.** The window lives in a special workspace (Omarchy's
-  scratchpad by default): a click shows it, another puts it away.
-
-| Mouse | Action |
-|---|---|
-| Left click | Show the window, or put it away |
-| Middle click | Quit WhatsApp |
-| Right click | The menu |
-| Hover | Preview of what's unread |
-
-IPC: `quickshell ipc -p $OMARCHY_PATH/shell call whatsapp-claude toggle`
-(also `show`, `hide`, `open <jid>`, `pause <minutes>`, `resume`, `status`).
-
-## Keyboard
-
-| Keys | Action |
-|---|---|
-| Ctrl+K | Search |
-| Ctrl+N | New chat |
-| Alt+↑ / Alt+↓ | Previous / next chat |
-| Ctrl+Alt+E | Archive |
-| Ctrl+Alt+Shift+M / U / P | Mute / mark unread / pin |
-| Ctrl+Alt+Shift+F | Search in the chat |
-| Ctrl+Alt+I | Contact info |
-| Ctrl+, | Settings |
-| Ctrl+W | Hide the window |
-| Ctrl+/ | All shortcuts |
-
-## Notes
-
-The window is Quickshell's (app id `org.quickshell`, shared by every window
-of the shell), so docks and taskbars show Quickshell's icon for it.
+## Disclaimer
 
 Unofficial client, not affiliated with WhatsApp LLC or Meta Platforms, Inc.
-Use it at your own risk: WhatsApp's terms don't allow third-party clients.
+WhatsApp's terms don't allow third-party clients: use it at your own risk.
+
+Screenshots show made-up people and chats. Avatars are
+[DiceBear Notionists](https://www.dicebear.com/styles/notionists/) (CC0);
+photos are from [Unsplash](https://unsplash.com) via
+[Lorem Picsum](https://picsum.photos).
