@@ -471,6 +471,9 @@ func (b *Bridge) handle(raw any) {
 			} else if news {
 				b.db.Exec(`UPDATE chats SET unread = unread + 1 WHERE jid = ?`, m.Chat)
 				b.unarchiveOnNews(m.Chat)
+				// message() marked the list dirty before this count: a flush in
+				// between would leave it unsent.
+				b.dirty.Store(true)
 			}
 			emit(map[string]any{"t": "message", "msg": m, "new": news})
 		}

@@ -192,13 +192,13 @@ Item {
     'say "Updating Omawhats $from → $to"',
     'new=$(git -C "$dir" fetch -q 2>/dev/null && git -C "$dir" log --reverse --format="    • %s" HEAD..FETCH_HEAD)',
     '[ -n "$new" ] && printf "\\n  What\'s new:\\n%s\\n" "$new"',
-    'echo',
+    'printf "\\n  It runs:\\n    omarchy plugin update %s --yes\\n    omarchy-restart-shell\\n\\n" "$id"',
     'if ! gum confirm "Update Omawhats to $to?"; then say "Update cancelled"; echo cancelled >"$b.log"; echo 130 >"$b.rc"; exit 130; fi',
-    'say "omarchy plugin update $id"',
+    'say "omarchy plugin update $id --yes"',
     'omarchy plugin update "$id" --yes >"$b.log" 2>&1; rc=$?',
     'if [ $rc -ne 0 ]; then printf "\\033[31m%s\\033[0m\\n" "$(tail -n 3 "$b.log")"',
     'elif grep -q " is up to date\\.$" "$b.log"; then say "Already up to date"',
-    'else say "Restarting the shell"; omarchy-restart-shell >>"$b.log" 2>&1 || rc=$?; [ $rc -eq 0 ] && say "Omawhats $to is in"; fi',
+    'else say "omarchy-restart-shell"; omarchy-restart-shell >>"$b.log" 2>&1 || rc=$?; [ $rc -eq 0 ] && say "Omawhats $to is in"; fi',
     'echo $rc >"$b.rc"',
     'exit $rc'
   ].join("\n")
@@ -232,7 +232,7 @@ Item {
       'b=$1; [ -f "$b.json" ] || exit 3; now=$(date +%s)\n' +
       'if [ ! -f "$b.rc" ]; then [ $((now - $(stat -c %Y "$b.json"))) -lt 600 ] && exit 5; rm -f "$b.json" "$b.log"; exit 3; fi\n' +
       '[ $((now - $(stat -c %Y "$b.rc"))) -ge 2 ] || exit 4\n' +
-      'head -n 1 "$b.json"; head -n 1 "$b.rc"; tail -n 20 "$b.log" 2>/dev/null; rm -f "$b.json" "$b.rc" "$b.log"',
+      'head -n 1 "$b.json"; head -n 1 "$b.rc"; tail -n 20 "$b.log" 2>/dev/null; rm -f "$b.json" "$b.rc" "$b.log" "$b.sh"',
       "pickup", u.base]
     stdout: StdioCollector { id: pickupOut; waitForEnd: true }
     onExited: code => {

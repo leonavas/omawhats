@@ -70,18 +70,19 @@ Item {
   // counts them on its Chats tab, and the messages in them.
   readonly property var attention: {
     wa.chatsRev
-    var out = { chats: 0, direct: 0, groups: 0, messages: 0, archived: 0, muted: 0 }
+    var out = { chats: 0, direct: 0, groups: 0, messages: 0, directMessages: 0, groupMessages: 0, archived: 0, muted: 0 }
     for (var k in wa.chatMap) {
       var c = wa.chatMap[k]
       if (!(c.unread > 0 || c.marked)) continue
       if (c.archived) { out.archived++; continue }
       if (wa.isMuted(c)) { out.muted++; continue }
-      // The badges count chats, one each however many messages wait in it,
-      // as WhatsApp does.
+      // The window title and the rail count chats, as WhatsApp does; the
+      // bar's badges count messages (a chat marked unread counts one).
+      var n = Math.max(c.unread || 0, 1)
       out.chats++
-      out.messages += Math.max(c.unread || 0, 1)
-      if (c.kind === "group") out.groups++
-      else out.direct++
+      out.messages += n
+      if (c.kind === "group") { out.groups++; out.groupMessages += n }
+      else { out.direct++; out.directMessages += n }
     }
     return out
   }

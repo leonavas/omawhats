@@ -11,7 +11,7 @@ import "lib/Format.js" as F
 
 // The bar's door into WhatsApp, as whatsapp-tui's widget is to it: the mark
 // (white and tinted like the bar's glyphs, outlined, green, or a Nerd Font
-// glyph), a red badge for unread direct chats and a blue one for groups
+// glyph), a red badge for unread messages in direct chats and a blue one for groups
 // (muted chats count in neither), a preview of them on hover, the menu on a
 // right click, pauses. The app itself is the plugin's service
 // (Service.qml): it runs WhatsApp, the window and the notifications.
@@ -111,8 +111,8 @@ BarWidget {
   property real nowSec: Date.now() / 1000
   Timer { interval: 20000; repeat: true; running: true; onTriggered: root.nowSec = Date.now() / 1000 }
 
-  readonly property var att: root.stateLive && root.service ? root.service.attention : ({ chats: 0, direct: 0, groups: 0, messages: 0, muted: 0, archived: 0 })
-  readonly property int attention: root.att.chats
+  readonly property var att: root.stateLive && root.service ? root.service.attention : ({ chats: 0, direct: 0, groups: 0, messages: 0, directMessages: 0, groupMessages: 0, muted: 0, archived: 0 })
+  readonly property int attention: root.att.messages
   readonly property bool muted: !!root.service && root.service.paused
   // A new version on GitHub (core/Updater.qml): a line in the preview and
   // a row in the menu; a click updates.
@@ -141,8 +141,8 @@ BarWidget {
 
   // Two counts, two corners. A pause hides both.
   readonly property bool badgesOn: !root.muted && root.badgeStyle !== "None" && root.stateLive
-  readonly property int directCount: root.badgesOn ? root.att.direct : 0
-  readonly property int groupCount: root.badgesOn ? root.att.groups : 0
+  readonly property int directCount: root.badgesOn ? root.att.directMessages : 0
+  readonly property int groupCount: root.badgesOn ? root.att.groupMessages : 0
   readonly property bool anyBadge: root.directCount > 0 || root.groupCount > 0
   // "Combined" folds both into one badge: red while a direct chat waits, blue
   // when only groups do.

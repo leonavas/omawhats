@@ -183,8 +183,10 @@ func (b *Bridge) message(e *events.Message, status int) *Msg {
 		m.Forwarded = max(int(ci.GetForwardingScore()), 1)
 	}
 	x := xJSON(m.Chat, m.ID, c)
-	var had int
-	m.fresh = b.db.QueryRow(`SELECT 1 FROM messages WHERE chat = ? AND id = ?`, m.Chat, m.ID).Scan(&had) != nil
+	// New here, or decrypted at last in place of its "Waiting for this
+	// message" (which counted for nothing): news either way.
+	var had string
+	m.fresh = b.db.QueryRow(`SELECT kind FROM messages WHERE chat = ? AND id = ?`, m.Chat, m.ID).Scan(&had) != nil || had == "placeholder"
 	// A message the phone resends after a placeholder takes its place; an
 	// older copy (a history sync's) never undoes what came live.
 	_, err := b.db.Exec(`INSERT INTO messages (chat, id, sender, push_name, from_me, ts, kind, text, x, quote_id, quote_from, quote_kind, quote_text, quote_thumb, status, wa_sender, card, forwarded)
@@ -221,7 +223,13 @@ func (b *Bridge) message(e *events.Message, status int) *Msg {
 		}
 	}
 	b.dirty.Store(true)
-	return b.load(m.Chat, m.ID)
+	// As stored, with its media and names; `fresh` is this call's to say
+	// (the row read back can't know it), and makes it news (handle).
+	out := b.load(m.Chat, m.ID)
+	if out != nil {
+		out.fresh = m.fresh
+	}
+	return out
 }
 
 // placeholder stands in for a message this device couldn't decrypt, as
