@@ -28,7 +28,7 @@ if [ ! -x "$bin" ]; then
   echo '{"t":"build","state":"start"}'
   mkdir -p "$bindir"
   if command -v mise >/dev/null 2>&1; then
-    gocmd=(mise exec go@1.27 -- go)
+    gocmd=(mise exec go@1.27.2 -- go)
   elif command -v go >/dev/null 2>&1; then
     gocmd=(go)
   else
@@ -38,7 +38,7 @@ if [ ! -x "$bin" ]; then
   # Go's module and build caches stay in our cache folder, so removing it
   # leaves nothing behind (-modcacherw: Go's module cache is read-only
   # otherwise, and rm -rf couldn't take it).
-  if ! (cd "$here" && CGO_ENABLED=0 GOMODCACHE="$cache/go/mod" GOCACHE="$cache/go/build" GOFLAGS=-modcacherw \
+  if ! (cd "$here" && CGO_ENABLED=0 GOTOOLCHAIN=local GOMODCACHE="$cache/go/mod" GOCACHE="$cache/go/build" GOFLAGS=-modcacherw \
         "${gocmd[@]}" build -trimpath -ldflags "-s -w" -o "$bin.tmp" .) >&2; then
     rm -f "$bin.tmp"
     echo '{"t":"build","state":"failed","error":"build"}'

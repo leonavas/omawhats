@@ -112,7 +112,7 @@ rm -rf ~/.config/omawhats ~/.local/share/omawhats ~/.cache/omawhats
 ```
 
 And the Go that `mise` fetched for the build, if nothing else of yours uses
-it: `mise uninstall go@1.27`.
+it: `mise uninstall go@1.27.2`.
 
 ## Development
 

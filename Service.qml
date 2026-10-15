@@ -153,7 +153,11 @@ Item {
   // (hideWindow) unmaps it; the app keeps counting and notifying either way.
   property var barOptions: ({ specialName: "scratchpad", openInSpecial: true, hideMode: "Special workspace", launchForeground: true })
   property bool autoStarted: false
-  readonly property string specialName: String(root.barOptions.specialName || "scratchpad")
+  // A plain name only: it goes into Hyprland dispatches.
+  readonly property string specialName: {
+    var n = String(root.barOptions.specialName || "")
+    return /^[A-Za-z0-9_-]{1,32}$/.test(n) ? n : "scratchpad"
+  }
   readonly property var toplevel: root.windowOpen ? root.ourToplevel() : null
   readonly property bool parked: root.workspaceOf(root.toplevel) === "special:" + root.specialName
   readonly property bool specialShown: {
@@ -227,9 +231,9 @@ Item {
     interval: 200
     onTriggered: {
       var lua = Hyprland.usingLua === true
-      var hide = lua ? 'hl.dsp.workspace.toggle_special("' + root.specialName + '")' : "togglespecialworkspace " + root.specialName
+      var hide = lua ? "hl.dsp.workspace.toggle_special(" + root.luaStr(root.specialName) + ")" : "togglespecialworkspace " + root.specialName
       var back = root._launchBack
-      var focus = back.length === 0 ? "" : lua ? 'hl.dsp.focus({ window = "' + back + '" })' : "focuswindow " + back
+      var focus = back.length === 0 ? "" : lua ? "hl.dsp.focus({ window = " + root.luaStr(back) + " })" : "focuswindow " + back
       Quickshell.execDetached(["bash", "-c",
         'shown=$(hyprctl monitors -j | jq -r \'.[] | select(.focused) | .specialWorkspace.name\'); '
         + '[ "$shown" = "special:$1" ] && hyprctl dispatch "$2" >/dev/null; '
@@ -253,15 +257,20 @@ Item {
     if (address && ws && ws.indexOf("special:") !== 0) root.moveWindow(address, ws, false)
   }
 
+  // A value as a Lua string literal, for the Lua dispatches: whatever is in
+  // it (a workspace's name, an address) stays a string.
+  function luaStr(v) {
+    return '"' + String(v).replace(/[\\"]/g, "\\$&").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\0/g, "") + '"'
+  }
   function hyprDispatch(luaForm, legacyForm) {
     Hyprland.dispatch(Hyprland.usingLua === true ? luaForm : legacyForm)
   }
   function moveWindow(address, workspace, silent) {
-    root.hyprDispatch('hl.dsp.window.move({ window = "' + address + '", workspace = "' + workspace + '"' + (silent ? ", silent = true" : "") + " })",
+    root.hyprDispatch("hl.dsp.window.move({ window = " + root.luaStr(address) + ", workspace = " + root.luaStr(workspace) + (silent ? ", silent = true" : "") + " })",
                       (silent ? "movetoworkspacesilent " : "movetoworkspace ") + workspace + "," + address)
   }
   function toggleSpecial() {
-    root.hyprDispatch('hl.dsp.workspace.toggle_special("' + root.specialName + '")', "togglespecialworkspace " + root.specialName)
+    root.hyprDispatch("hl.dsp.workspace.toggle_special(" + root.luaStr(root.specialName) + ")", "togglespecialworkspace " + root.specialName)
   }
 
   function windowAddress() {
@@ -317,7 +326,7 @@ Item {
       if (!t || !t.address) return
       var addr = String(t.address)
       if (addr.indexOf("0x") !== 0) addr = "0x" + addr
-      Hyprland.dispatch(Hyprland.usingLua === true ? 'hl.dsp.focus({ window = "address:' + addr + '" })' : "focuswindow address:" + addr)
+      Hyprland.dispatch(Hyprland.usingLua === true ? "hl.dsp.focus({ window = " + root.luaStr("address:" + addr) + " })" : "focuswindow address:" + addr)
       root.tagWindow(addr)
     }
   }
@@ -331,7 +340,7 @@ Item {
     if (addr.indexOf("0x") !== 0) addr = "0x" + addr
     var tag = "+icon:" + root.appIcon
     Hyprland.dispatch(Hyprland.usingLua === true
-                      ? 'hl.dsp.window.tag({ tag = "' + tag.replace(/["\\]/g, "\\$&") + '", window = "address:' + addr + '" })'
+                      ? "hl.dsp.window.tag({ tag = " + root.luaStr(tag) + ", window = " + root.luaStr("address:" + addr) + " })"
                       : "tagwindow " + tag + " address:" + addr)
   }
 
