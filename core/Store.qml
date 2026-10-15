@@ -35,7 +35,13 @@ Item {
     cacheDir: wa.cacheDir
     enabled: wa.enabled
     onEvent: ev => wa.handle(ev)
-    onExited: code => { if (wa.conn === "ready") wa.conn = "offline" }
+    // Downloads it had under way won't be answered: asked again when shown.
+    onExited: code => {
+      if (wa.conn === "ready") wa.conn = "offline"
+      wa.downloads = ({})
+      wa._onDownloaded = ({})
+      wa.downloadsRev++
+    }
   }
   readonly property alias bridge: bridge
   readonly property string build: bridge.build
@@ -571,6 +577,12 @@ Item {
     }
     case "media": {
       var key = ev.chat + "|" + ev.id
+      // An auto download given up: its button again, not a failure.
+      if (ev.skipped) {
+        delete wa.downloads[key]
+        wa.downloadsRev++
+        break
+      }
       if (ev.error) {
         wa.downloads[key] = "failed"
         wa.downloadsRev++

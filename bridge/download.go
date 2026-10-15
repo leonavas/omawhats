@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"io"
 	"mime"
@@ -349,9 +350,16 @@ func mediaFailed(chat, id, why string) {
 	emit(map[string]any{"t": "media", "chat": chat, "id": id, "error": why})
 }
 
+// mediaSkipped is an `auto` download given up: the app shows the picture's
+// download button again, whose click may ask the phone.
+func mediaSkipped(chat, id string) {
+	emit(map[string]any{"t": "media", "chat": chat, "id": id, "skipped": true})
+}
+
 // download fetches a message's media into the cache, once; the answer is a
 // `media` event with the file, or with why not. An `auto` one (a photo
-// on screen) gives up quietly where the phone would have to be asked.
+// on screen) gives up where the phone would have to be asked, and says so
+// with mediaSkipped.
 func (b *Bridge) download(chat, id string, auto bool) {
 	key := chat + "\x00" + id
 	if _, busy := inFlight.LoadOrStore(key, true); busy {
@@ -369,7 +377,12 @@ func (b *Bridge) download(chat, id string, auto bool) {
 		if !auto {
 			logf("download %s %s: not stored: %v", chat, id, err)
 			mediaFailed(chat, id, unavailable)
+			return
 		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			logf("download %s %s (auto): %v", chat, id, err)
+		}
+		mediaSkipped(chat, id)
 		return
 	}
 	path := mediaFile(chat, id, mimeType)
@@ -389,6 +402,8 @@ func (b *Bridge) download(chat, id string, auto bool) {
 		// Stored before the keys were kept: the phone has them.
 		if !auto {
 			b.recoverMedia(chat, id, sender, ts)
+		} else {
+			mediaSkipped(chat, id)
 		}
 		return
 	}
@@ -398,6 +413,7 @@ func (b *Bridge) download(chat, id string, auto bool) {
 		done()
 	case auto:
 		logf("download %s (auto): %v", id, err)
+		mediaSkipped(chat, id)
 	case errors.Is(err, whatsmeow.ErrMediaDownloadFailedWith404) || errors.Is(err, whatsmeow.ErrMediaDownloadFailedWith410):
 		// Expired on the server: the phone, if it still has it, uploads it again.
 		logf("download %s %s: expired (%v), asking the phone", chat, id, err)
