@@ -7,7 +7,6 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -70,15 +69,26 @@ func (p *Player) start() error {
 	if p.conn != nil {
 		return nil
 	}
-	sock := filepath.Join(os.TempDir(), fmt.Sprintf("omawhats-mpv-%d.sock", os.Getpid()))
-	os.Remove(sock)
+	// Its control socket, in a folder only we can enter (0700, a random
+	// name), in the session's runtime folder when there is one: a path in
+	// the shared /tmp could be taken first by someone else.
+	base := os.Getenv("XDG_RUNTIME_DIR")
+	if base == "" {
+		base = os.TempDir()
+	}
+	dir, err := os.MkdirTemp(base, "omawhats-mpv-")
+	if err != nil {
+		return err
+	}
+	sock := filepath.Join(dir, "mpv.sock")
+	// Only the file it's given: no youtube-dl, no playlist pointing elsewhere.
 	cmd := exec.Command("mpv", "--idle=yes", "--no-video", "--no-config", "--no-terminal", "--really-quiet",
-		"--audio-display=no", "--input-ipc-server="+sock)
+		"--audio-display=no", "--ytdl=no", "--load-unsafe-playlists=no", "--input-ipc-server="+sock)
 	if err := cmd.Start(); err != nil {
+		os.RemoveAll(dir)
 		return err
 	}
 	var conn net.Conn
-	var err error
 	for range 50 {
 		if conn, err = net.Dial("unix", sock); err == nil {
 			break
@@ -87,6 +97,8 @@ func (p *Player) start() error {
 	}
 	if err != nil {
 		cmd.Process.Kill()
+		cmd.Wait()
+		os.RemoveAll(dir)
 		return err
 	}
 	p.cmd, p.conn = cmd, conn
@@ -101,7 +113,7 @@ func (p *Player) start() error {
 			p.cmd, p.conn = nil, nil
 		}
 		p.mu.Unlock()
-		os.Remove(sock)
+		os.RemoveAll(dir)
 	}()
 	return nil
 }

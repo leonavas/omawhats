@@ -14,6 +14,7 @@ Item {
   readonly property var wa: app.wa
 
   component Section: Text {
+    textFormat: Text.PlainText
     width: parent ? parent.width : 0
     leftPadding: sv.t.sp(28)
     topPadding: sv.t.sp(22)
@@ -38,8 +39,8 @@ Item {
       width: parent.width - sv.t.sp(110)
       anchors.verticalCenter: parent.verticalCenter
       spacing: sv.t.sp(3)
-      Text { width: parent.width; text: tg.label; color: sv.t.text; font.family: sv.t.font; font.pixelSize: sv.t.fsName - 1; wrapMode: Text.Wrap }
-      Text { width: parent.width; visible: tg.sub !== ""; text: tg.sub; color: sv.t.dim; font.family: sv.t.font; font.pixelSize: sv.t.fsSmall + 1; wrapMode: Text.Wrap }
+      Text { textFormat: Text.PlainText; width: parent.width; text: tg.label; color: sv.t.text; font.family: sv.t.font; font.pixelSize: sv.t.fsName - 1; wrapMode: Text.Wrap }
+      Text { textFormat: Text.PlainText; width: parent.width; visible: tg.sub !== ""; text: tg.sub; color: sv.t.dim; font.family: sv.t.font; font.pixelSize: sv.t.fsSmall + 1; wrapMode: Text.Wrap }
     }
     Rectangle {
       anchors.right: parent.right
@@ -71,6 +72,7 @@ Item {
     Rectangle { anchors.fill: parent; anchors.leftMargin: sv.t.sp(10); anchors.rightMargin: sv.t.sp(10); radius: sv.t.sp(10); color: cma.containsMouse ? sv.t.hover : "transparent" }
     Icon { visible: ch.icon !== ""; x: sv.t.sp(28); anchors.verticalCenter: parent.verticalCenter; name: ch.icon; size: sv.t.sp(22); color: ch.danger ? sv.t.danger : sv.t.icon }
     Text {
+      textFormat: Text.PlainText
       x: ch.icon !== "" ? sv.t.sp(72) : sv.t.sp(28)
       anchors.verticalCenter: parent.verticalCenter
       text: ch.label
@@ -79,6 +81,7 @@ Item {
       font.pixelSize: sv.t.fsName - 1
     }
     Text {
+      textFormat: Text.PlainText
       anchors.right: parent.right
       anchors.rightMargin: sv.t.sp(28)
       anchors.verticalCenter: parent.verticalCenter
@@ -129,8 +132,8 @@ Item {
           anchors.rightMargin: sv.t.sp(20)
           anchors.verticalCenter: parent.verticalCenter
           spacing: sv.t.sp(4)
-          Text { width: parent.width; text: sv.wa.me ? (sv.wa.me.name || "") : ""; color: sv.t.textBright; font.family: sv.t.font; font.pixelSize: sv.t.px(18); elide: Text.ElideRight }
-          Text { width: parent.width; text: sv.wa.me ? U.phone(sv.wa.me.phone) : ""; color: sv.t.dim; font.family: sv.t.font; font.pixelSize: sv.t.fsText }
+          Text { textFormat: Text.PlainText; width: parent.width; text: sv.wa.me ? (sv.wa.me.name || "") : ""; color: sv.t.textBright; font.family: sv.t.font; font.pixelSize: sv.t.px(18); elide: Text.ElideRight }
+          Text { textFormat: Text.PlainText; width: parent.width; text: sv.wa.me ? U.phone(sv.wa.me.phone) : ""; color: sv.t.dim; font.family: sv.t.font; font.pixelSize: sv.t.fsText }
         }
         MouseArea { id: mema; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: sv.win.dialog("profile") }
       }

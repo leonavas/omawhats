@@ -29,6 +29,7 @@ Rectangle {
       anchors.verticalCenter: parent.verticalCenter
     }
     Text {
+      textFormat: Text.PlainText
       text: "WhatsApp"
       color: lv.t.accent
       font.family: lv.t.font
@@ -61,6 +62,7 @@ Rectangle {
         width: parent.width - qrSide.width - lv.t.sp(50)
         spacing: lv.t.sp(18)
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           text: lv.build === "building" ? lv.app.tr("Getting WhatsApp ready", "Preparando o WhatsApp")
               : lv.build === "failed" ? lv.app.tr("WhatsApp couldn't start", "Não foi possível iniciar o WhatsApp")
@@ -79,6 +81,7 @@ Rectangle {
           width: parent.width
           spacing: lv.t.sp(14)
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             wrapMode: Text.Wrap
             lineHeight: 1.3
@@ -96,7 +99,7 @@ Rectangle {
             visible: lv.build === "failed"
             width: retryText.implicitWidth + lv.t.sp(40); height: lv.t.sp(40); radius: height / 2
             color: lv.t.accent
-            Text { id: retryText; anchors.centerIn: parent; text: lv.app.tr("Try again", "Tentar de novo"); color: lv.t.onBrand; font.family: lv.t.font; font.pixelSize: lv.t.fsText; font.weight: Font.Medium }
+            Text { id: retryText; textFormat: Text.PlainText; anchors.centerIn: parent; text: lv.app.tr("Try again", "Tentar de novo"); color: lv.t.onBrand; font.family: lv.t.font; font.pixelSize: lv.t.fsText; font.weight: Font.Medium }
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: lv.wa.bridge.retry() }
           }
         }
@@ -129,9 +132,10 @@ Rectangle {
                 color: "transparent"
                 border.width: 1.5
                 border.color: lv.t.dim
-                Text { anchors.centerIn: parent; text: index + 1; color: lv.t.text; font.family: lv.t.font; font.pixelSize: lv.t.fsText }
+                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: index + 1; color: lv.t.text; font.family: lv.t.font; font.pixelSize: lv.t.fsText }
               }
               Text {
+                textFormat: Text.PlainText
                 width: parent.width - lv.t.sp(42)
                 anchors.verticalCenter: parent.verticalCenter
                 text: modelData
@@ -143,6 +147,7 @@ Rectangle {
             }
           }
           Text {
+            textFormat: Text.PlainText
             visible: lv.build === ""
             topPadding: lv.t.sp(10)
             text: (lv.phoneMode ? lv.app.tr("Log in with QR code", "Entrar com QR code") : lv.app.tr("Log in with phone number", "Entrar com número de telefone")) + "  ›"
@@ -176,6 +181,7 @@ Rectangle {
           spacing: lv.t.sp(14)
           BusyIndicator { anchors.horizontalCenter: parent.horizontalCenter; running: parent.visible; width: lv.t.sp(48); height: width }
           Text {
+            textFormat: Text.PlainText
             anchors.horizontalCenter: parent.horizontalCenter
             text: lv.build === "building" ? lv.app.tr("Compiling…", "Compilando…") : lv.app.tr("Loading…", "Carregando…")
             color: lv.t.dim
@@ -256,10 +262,11 @@ Rectangle {
             visible: !lv.wa.pairCode
             width: parent.width; height: lv.t.sp(44); radius: height / 2
             color: lv.t.accent
-            Text { anchors.centerIn: parent; text: lv.app.tr("Next", "Avançar"); color: lv.t.onBrand; font.family: lv.t.font; font.pixelSize: lv.t.fsText; font.weight: Font.Medium }
+            Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: lv.app.tr("Next", "Avançar"); color: lv.t.onBrand; font.family: lv.t.font; font.pixelSize: lv.t.fsText; font.weight: Font.Medium }
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: lv.wa.pairPhone(phone.text) }
           }
           Text {
+            textFormat: Text.PlainText
             visible: lv.wa.pairError !== ""
             width: parent.width
             wrapMode: Text.Wrap
@@ -280,7 +287,7 @@ Rectangle {
                 width: modelData === "-" ? lv.t.sp(14) : lv.t.sp(30)
                 height: lv.t.sp(44)
                 Rectangle { visible: modelData !== "-"; anchors.fill: parent; radius: lv.t.sp(6); color: "transparent"; border.width: 1.5; border.color: lv.t.lineStrong }
-                Text { anchors.centerIn: parent; text: modelData; color: lv.t.textBright; font.family: lv.t.font; font.pixelSize: lv.t.px(22) }
+                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: modelData; color: lv.t.textBright; font.family: lv.t.font; font.pixelSize: lv.t.px(22) }
               }
             }
           }
@@ -296,6 +303,7 @@ Rectangle {
     spacing: lv.t.sp(6)
     Icon { name: "lock"; size: lv.t.sp(13); color: lv.t.faint; anchors.verticalCenter: parent.verticalCenter }
     Text {
+      textFormat: Text.PlainText
       text: lv.app.tr("Your personal messages are end-to-end encrypted", "Suas mensagens pessoais são protegidas com a criptografia de ponta a ponta")
       color: lv.t.faint
       font.family: lv.t.font

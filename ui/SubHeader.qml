@@ -21,6 +21,7 @@ Item {
     onClicked: h.back()
   }
   Text {
+    textFormat: Text.PlainText
     anchors.left: backBtn.right
     anchors.leftMargin: h.t.sp(14)
     anchors.right: parent.right

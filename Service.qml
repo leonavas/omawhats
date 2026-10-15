@@ -425,15 +425,14 @@ Item {
     root.notify(ev.chat, ev.id, store.nameOf(ev.chat), body)
   }
 
+  // Sent by the bridge over the session bus, not by notify-send: a command's
+  // arguments can be read by any user of the machine, and these carry who
+  // wrote and what.
   function notify(chat, msg, title, body) {
     var avatar = U.unfileUrl(String(store.avatar(chat)).replace(/\?.*$/, ""))
     var openArgv = ["omarchy-shell", "-q", "omawhats", "openAt", String(chat), String(msg || "")]
-    Quickshell.execDetached(["notify-send",
-      "--app-name=WhatsApp",
-      "--icon=" + (avatar || root.appIcon),
-      "--hint=string:omarchy-exec-argv:" + JSON.stringify(openArgv),
-      title,
-      body])
+    store.send({ c: "notify", app: "WhatsApp", icon: avatar || root.appIcon, title: String(title), text: String(body),
+                 exec: JSON.stringify(openArgv) })
     if (root.soundOn && Date.now() - root._lastSound > 1500) {
       root._lastSound = Date.now()
       Quickshell.execDetached(["sh", "-c", 'for f in "$1" /usr/share/sounds/freedesktop/stereo/message-new-instant.oga /usr/share/sounds/freedesktop/stereo/message.oga /usr/share/sounds/freedesktop/stereo/bell.oga; do [ -f "$f" ] && exec pw-play "$f"; done; exit 0', "sound", root.setting("soundFile", "")])
@@ -441,28 +440,71 @@ Item {
   }
 
   // ---------------------------------------------------------------- utilities
-  function copy(text) { Quickshell.execDetached(["wl-copy", "--", String(text)]) }
+  // The text goes to wl-copy on its stdin: as an argument it would stay
+  // readable by any user of the machine while the clipboard holds it.
+  function copy(text) { copyComponent.createObject(root, { text: String(text) }).running = true }
+  Component {
+    id: copyComponent
+    Process {
+      property string text: ""
+      command: ["wl-copy"]
+      stdinEnabled: true
+      onStarted: { write(text); stdinEnabled = false }
+      onExited: destroy()
+    }
+  }
   function copyImage(path) { Quickshell.execDetached(["sh", "-c", 'wl-copy < "$1"', "copy", path]) }
-  function openUrl(url) { if (url) Qt.openUrlExternally(url) }
-  function openFile(path) { if (path) Quickshell.execDetached(["xdg-open", U.unfileUrl(path)]) }
+  // Only what a browser, the mail app or the dialer opens: a link that came
+  // in a message could otherwise hand a file or a command to its handler.
+  function openUrl(url) {
+    var s = String(url || "").trim()
+    if (/^(https?:\/\/|mailto:|tel:)/i.test(s)) Qt.openUrlExternally(s)
+  }
+  // A business's e-mail, when it is one address and nothing more.
+  function openMail(address) {
+    var s = String(address || "").trim()
+    if (/^[^\s@?&#\/:;,<>"]+@[^\s@?&#\/:;,<>"]+\.[^\s@?&#\/:;,<>"]+$/.test(s)) Qt.openUrlExternally("mailto:" + s)
+  }
+  // A received file opens in its app only when it's a document, a picture,
+  // audio, video or an archive. Anything else (a script, a launcher, a
+  // program, a web page) is shown in its folder, where you decide.
+  readonly property var _openable: ["pdf", "txt", "md", "csv", "tsv", "rtf", "odt", "ods", "odp", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "epub",
+                                    "jpg", "jpeg", "png", "gif", "webp", "bmp", "tif", "tiff", "heic", "heif", "avif",
+                                    "mp3", "m4a", "aac", "ogg", "oga", "opus", "wav", "flac", "amr",
+                                    "mp4", "m4v", "mov", "mkv", "webm", "avi", "3gp",
+                                    "zip", "rar", "7z", "tar", "gz", "xz", "bz2", "zst"]
+  function openFile(path) {
+    if (!path) return
+    var p = U.unfileUrl(path)
+    if (root._openable.indexOf(U.ext(p)) >= 0) { Quickshell.execDetached(["xdg-open", p]); return }
+    root.showInFolder(p)
+    if (root.appWindow) root.appWindow.toast(root.tr("This kind of file isn't opened directly: here's its folder",
+                                                     "Esse tipo de arquivo não é aberto direto: aqui está a pasta dele"))
+  }
   function showInFolder(path) { if (path) Quickshell.execDetached(["sh", "-c", 'nautilus --select "$1" 2>/dev/null || xdg-open "$(dirname "$1")"', "show", U.unfileUrl(path)]) }
 
-  // A video plays in mpv (Omarchy's player), in a window of its own.
+  // A video plays in mpv (Omarchy's player), in a window of its own: only
+  // the file, no youtube-dl and no playlist pointing elsewhere.
   function playVideo(path, loop) {
     if (!path) return
-    var args = ["mpv", "--force-window=yes", "--title=WhatsApp", "--keep-open=no"]
+    var args = ["mpv", "--force-window=yes", "--title=WhatsApp", "--keep-open=no", "--ytdl=no", "--load-unsafe-playlists=no"]
     if (loop) args.push("--loop-file=inf", "--mute=yes")
     args.push(U.unfileUrl(path))
     Quickshell.execDetached(args)
   }
 
   // Saves a downloaded file to ~/Downloads under its own name (a number
-  // added when one is there), then says where.
+  // added when one is there), then says where. The name came from whoever
+  // sent it: only its last part, with no leading dot or dash, so it can't
+  // reach another folder or hide; the script checks that once more.
+  function safeName(name) {
+    return U.basename(String(name || "").replace(/\\/g, "/")).replace(/[\x00-\x1f\x7f]/g, "").trim().replace(/^[.\-\s]+/, "")
+  }
   function saveToDownloads(path, name, cb) {
     var src = U.unfileUrl(path)
-    var base = name || U.basename(src)
+    var base = root.safeName(name) || root.safeName(U.basename(src))
     saver.cb = cb || null
-    saver.command = ["sh", "-c", 'dir="$1"; src="$2"; name="$3"; mkdir -p "$dir"; stem="${name%.*}"; ext="${name##*.}"; [ "$ext" = "$name" ] && ext="" || ext=".$ext"; out="$dir/$name"; n=1; while [ -e "$out" ]; do out="$dir/$stem ($n)$ext"; n=$((n+1)); done; cp "$src" "$out" && echo "$out"',
+    saver.command = ["sh", "-c", 'dir="$1"; src="$2"; name="$3"; case "$name" in ""|*/*|.*|-*) exit 1;; esac; mkdir -p "$dir"; stem="${name%.*}"; ext="${name##*.}"; [ "$ext" = "$name" ] && ext="" || ext=".$ext"; out="$dir/$name"; n=1; while [ -e "$out" ] || [ -L "$out" ]; do out="$dir/$stem ($n)$ext"; n=$((n+1)); done; cp -- "$src" "$out" && echo "$out"',
                      "save", root.downloadsDir, src, base]
     saver.running = true
   }
@@ -516,7 +558,7 @@ Item {
   Process {
     id: folders
     command: ["sh", "-c",
-      'for d in "$@"; do old=${d%/*}/whatsapp-claude; [ -d "$old" ] && mv -T "$old" "$d"; done; mkdir -p -m 700 "$@"; exit 0',
+      'for d in "$@"; do old=${d%/*}/whatsapp-claude; [ -d "$old" ] && mv -T "$old" "$d"; done; mkdir -p -m 700 "$@"; chmod 700 "$@"; chmod 600 "$1/settings.json" 2>/dev/null; exit 0',
       "folders", root.configDir, root.cacheDir, root.dataDir]
     onExited: root.ready = true
   }

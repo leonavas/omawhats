@@ -45,6 +45,7 @@ Rectangle {
       color: rail.t.badge
       Text {
         id: badgeText
+        textFormat: Text.PlainText
         anchors.centerIn: parent
         text: rb.badge > 99 ? "99+" : rb.badge
         color: rail.t.badgeText
@@ -122,6 +123,7 @@ Rectangle {
         border.width: 2
         border.color: rail.t.rail
         Text {
+          textFormat: Text.PlainText
           anchors.centerIn: parent
           text: parent.phase === "updated" ? "↻" : "↑"
           color: rail.t.onColor(rail.t.green)

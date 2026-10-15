@@ -141,6 +141,7 @@ func (md *Media) fill(chat, id string, part *waE2E.Message) {
 		if md.Name == "" {
 			md.Name = x.GetTitle()
 		}
+		md.Name = safeFileName(md.Name)
 	case part.GetStickerMessage() != nil:
 		// Its file is small: fetched as it shows, no thumbnail needed.
 		x := part.GetStickerMessage()
@@ -239,17 +240,54 @@ func (b *Bridge) storeMedia(chat, id string, md *Media, part *waE2E.Message, waC
 var exts = map[string]string{
 	"audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac", "audio/amr": "amr",
 	"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "video/mp4": "mp4", "video/3gpp": "3gp", "application/pdf": "pdf",
+	// Documents, as the app knows them (only these open straight in their app).
+	"text/plain": "txt", "text/csv": "csv", "text/markdown": "md", "application/rtf": "rtf", "application/epub+zip": "epub",
+	"application/msword": "doc", "application/vnd.ms-excel": "xls", "application/vnd.ms-powerpoint": "ppt",
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document":   "docx",
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":         "xlsx",
+	"application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+	"application/vnd.oasis.opendocument.text":                                   "odt", "application/vnd.oasis.opendocument.spreadsheet": "ods",
+	"application/vnd.oasis.opendocument.presentation": "odp",
+	"application/zip": "zip", "application/x-zip-compressed": "zip", "application/vnd.rar": "rar", "application/x-rar-compressed": "rar",
+	"application/x-7z-compressed": "7z", "image/gif": "gif", "image/heic": "heic", "video/quicktime": "mov", "video/webm": "webm",
 }
 
+// extOf is the extension a media's file gets from the type its sender
+// declared: letters and digits only, so it never makes a path of its own.
 func extOf(mimeType string) string {
 	t, _, _ := mime.ParseMediaType(mimeType)
 	if e, ok := exts[t]; ok {
 		return e
 	}
 	if es, _ := mime.ExtensionsByType(t); len(es) > 0 {
-		return strings.TrimPrefix(es[0], ".")
+		if e := strings.TrimPrefix(es[0], "."); e != "" && len(e) <= 8 && strings.IndexFunc(e, func(r rune) bool {
+			return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9')
+		}) < 0 {
+			return e
+		}
 	}
 	return "bin"
+}
+
+// safeFileName is a document's name as its sender gave it, made a plain
+// file name: the last part of any path, no control characters, and no
+// leading dot or dash, so saving it can't reach another folder or hide it.
+func safeFileName(name string) string {
+	name = strings.ReplaceAll(name, "\\", "/")
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		name = name[i+1:]
+	}
+	name = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, name)
+	name = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(name), ".-"))
+	if r := []rune(name); len(r) > 200 {
+		name = strings.TrimLeft(string(r[len(r)-200:]), ".-")
+	}
+	return name
 }
 
 // mediaDir is where the media goes: <cache>/media.
@@ -316,7 +354,7 @@ func linkOrCopy(from, to string) error {
 	}
 	defer in.Close()
 	tmp := to + ".tmp"
-	out, err := os.Create(tmp)
+	out, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}

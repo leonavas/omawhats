@@ -20,10 +20,12 @@ Click the bar icon, then on your phone go to **WhatsApp → Linked devices →
 Link a device** and scan the QR code (or pick **Log in with phone number**).
 Your phone doesn't need to stay online afterwards.
 
-The first start builds the bridge with Go fetched through `mise`, which ships
-with Omarchy. It takes a minute or two, once per version. Everything else it
-uses (`mpv`, `ffmpeg`, `wl-clipboard`, `notify-send`, `xdg-open`,
-`omarchy-file-select`) comes with Omarchy too.
+There's nothing else to set up. The first start builds the bridge from the
+source in this repo, with Go fetched through `mise`, which ships with
+Omarchy: about a minute and some 700 MB of downloads the first time (Go
+itself and the bridge's modules, pinned by `go.sum`), and only a quick
+rebuild after an update. Everything else it uses (`mpv`, `ffmpeg`,
+`wl-clipboard`, `xdg-open`, `omarchy-file-select`) comes with Omarchy too.
 
 Installed before 0.2.0, as `leonavas.whatsapp-claude`? Reinstall once instead
 of updating; your settings and the session move over on their own:
@@ -81,18 +83,43 @@ off in Settings.
 
 ## Files
 
+All of them only yours (folders `0700`, files `0600`):
+
 - `~/.config/omawhats/settings.json`: settings and drafts.
 - `~/.local/share/omawhats/`: the session, the message store, avatars,
   the built bridge and its log.
-- `~/.cache/omawhats/`: downloaded media.
+- `~/.cache/omawhats/`: downloaded media, and Go's module and build caches
+  for the bridge (`go/`).
+- Go itself, which `mise` keeps in `~/.local/share/mise/installs/go/`.
 
 Log out from Settings (or unlink the device on your phone) to end the
 session. Your messages only travel between your machine and WhatsApp.
 
-## Development
+## Remove
+
+Log out first (Settings → Log out), so your phone drops the linked device;
+otherwise remove it on the phone under **Linked devices**. Then:
 
 ```sh
-git clone https://github.com/leonavas/omawhats
+omarchy plugin remove leonavas.omawhats
+```
+
+That removes the plugin and leaves your data. To remove the session,
+messages, media and settings too:
+
+```sh
+rm -rf ~/.config/omawhats ~/.local/share/omawhats ~/.cache/omawhats
+```
+
+And the Go that `mise` fetched for the build, if nothing else of yours uses
+it: `mise uninstall go@1.27`.
+
+## Development
+
+Link a clone of this repo into Omarchy's plugin folder, from the folder
+that holds it:
+
+```sh
 ln -s "$PWD/omawhats" ~/.config/omarchy/plugins/leonavas.omawhats
 omarchy-shell shell rescanPlugins
 omarchy plugin enable leonavas.omawhats --section right

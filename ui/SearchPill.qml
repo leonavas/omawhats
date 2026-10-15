@@ -51,6 +51,7 @@ Rectangle {
     Keys.onReturnPressed: f.accepted()
     Keys.onDownPressed: f.downPressed()
     Text {
+      textFormat: Text.PlainText
       anchors.fill: parent
       verticalAlignment: Text.AlignVCenter
       visible: input.text.length === 0

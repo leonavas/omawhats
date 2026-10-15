@@ -56,6 +56,7 @@ Item {
     // ---------------------------------------------------------- top line
     Text {
       id: time
+      textFormat: Text.PlainText
       anchors.right: parent.right
       anchors.top: parent.top
       anchors.topMargin: row.t.sp(3)
@@ -110,6 +111,7 @@ Item {
         color: row.muted ? row.t.faint : row.t.badge
         Text {
           id: count
+          textFormat: Text.PlainText
           anchors.centerIn: parent
           visible: !!row.c && row.c.unread > 0
           text: row.c ? (row.c.unread > 999 ? "999+" : row.c.unread) : ""

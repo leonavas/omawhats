@@ -28,6 +28,7 @@ Item {
     color: av.colors.bg
     visible: img.status !== Image.Ready
     Text {
+      textFormat: Text.PlainText
       anchors.centerIn: parent
       visible: av.letters !== ""
       text: av.letters

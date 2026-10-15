@@ -91,6 +91,7 @@ Item {
   Component {
     id: headC
     Text {
+      textFormat: Text.PlainText
       height: nc.t.sp(parent.row.type === "letter" ? 44 : 52)
       leftPadding: nc.t.sp(28)
       verticalAlignment: Text.AlignVCenter

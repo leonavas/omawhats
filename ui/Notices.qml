@@ -46,7 +46,7 @@ Column {
       anchors.rightMargin: n.t.sp(14)
       anchors.verticalCenter: parent.verticalCenter
       spacing: n.t.sp(2)
-      Text { width: parent.width; text: bn.title; color: n.t.textBright; font.family: n.t.font; font.pixelSize: n.t.fsText; wrapMode: Text.Wrap }
+      Text { textFormat: Text.PlainText; width: parent.width; text: bn.title; color: n.t.textBright; font.family: n.t.font; font.pixelSize: n.t.fsText; wrapMode: Text.Wrap }
       Text {
         width: parent.width
         visible: bn.sub !== "" || bn.action !== ""

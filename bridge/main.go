@@ -157,6 +157,11 @@ type Cmd struct {
 	// send_sticker: the chat a recent sticker came in (with ID), or Name,
 	// a favorite's hash.
 	From string `json:"from"`
+	// notify: a desktop notification (its body is Text).
+	Title string `json:"title"`
+	App   string `json:"app"`
+	Icon  string `json:"icon"`
+	Exec  string `json:"exec"`
 }
 
 var (
@@ -408,6 +413,8 @@ func (b *Bridge) commands() {
 			}
 		case "pair_phone":
 			go b.pairPhone(c.Phone)
+		case "notify":
+			go notify(c)
 		case "logout":
 			// Unlinks this device on the phone too; offline, nothing changes.
 			if err := b.cli.Logout(b.ctx); err != nil {

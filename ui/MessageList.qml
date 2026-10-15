@@ -197,7 +197,7 @@ Item {
     opacity: 0
     visible: opacity > 0 && label !== ""
     Behavior on opacity { NumberAnimation { duration: 200 } }
-    Text { id: chipText; anchors.centerIn: parent; text: dayChip.label; color: root.t.dim; font.family: root.t.font; font.pixelSize: root.t.fsSmall; font.weight: Font.Medium }
+    Text { id: chipText; textFormat: Text.PlainText; anchors.centerIn: parent; text: dayChip.label; color: root.t.dim; font.family: root.t.font; font.pixelSize: root.t.fsSmall; font.weight: Font.Medium }
     Timer { id: hideChip; interval: 1300; onTriggered: dayChip.opacity = 0 }
   }
 
@@ -223,13 +223,14 @@ Item {
       width: Math.max(height, nb.implicitWidth + root.t.sp(10))
       radius: height / 2
       color: root.t.badge
-      Text { id: nb; anchors.centerIn: parent; text: root.newBelow; color: root.t.badgeText; font.family: root.t.font; font.pixelSize: root.t.sp(11); font.weight: Font.DemiBold }
+      Text { id: nb; textFormat: Text.PlainText; anchors.centerIn: parent; text: root.newBelow; color: root.t.badgeText; font.family: root.t.font; font.pixelSize: root.t.sp(11); font.weight: Font.DemiBold }
     }
     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { list.positionViewAtBeginning(); root.newBelow = 0 } }
   }
 
   // Empty chat: WhatsApp's note, centered.
   Text {
+    textFormat: Text.PlainText
     anchors.centerIn: parent
     visible: { root.rev; return !!root.hist && root.hist.loaded && root.hist.msgs.length === 0 && !root.hist.loading }
     width: Math.min(parent.width - root.t.sp(60), root.t.sp(420))

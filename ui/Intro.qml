@@ -38,6 +38,7 @@ Rectangle {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       horizontalAlignment: Text.AlignHCenter
       text: intro.app.tr("WhatsApp for Omarchy", "WhatsApp para Omarchy")
@@ -47,6 +48,7 @@ Rectangle {
       font.weight: Font.Light
     }
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       horizontalAlignment: Text.AlignHCenter
       wrapMode: Text.Wrap
@@ -79,6 +81,7 @@ Rectangle {
             MouseArea { id: qa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: modelData.action() }
           }
           Text {
+            textFormat: Text.PlainText
             anchors.horizontalCenter: parent.horizontalCenter
             text: modelData.label
             color: intro.t.dim
@@ -97,6 +100,7 @@ Rectangle {
     spacing: intro.t.sp(6)
     Icon { name: "lock"; size: intro.t.sp(13); color: intro.t.faint; anchors.verticalCenter: parent.verticalCenter }
     Text {
+      textFormat: Text.PlainText
       text: intro.app.tr("Your personal messages are end-to-end encrypted", "Suas mensagens pessoais são protegidas com a criptografia de ponta a ponta")
       color: intro.t.faint
       font.family: intro.t.font

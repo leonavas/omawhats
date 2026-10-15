@@ -57,7 +57,6 @@ func (b *Bridge) bizProfile(ctx context.Context, jid types.JID, p map[string]any
 	if !found {
 		return 0, 0, false
 	}
-	logf("business_profile %s: %s", jid, node.String())
 	bp, err := b.cli.DangerousInternals().ParseBusinessProfile(&node)
 	if err != nil {
 		return 0, 0, false
@@ -110,7 +109,6 @@ func putBiz(p map[string]any, bp *types.BusinessProfile, description string, sit
 	}
 	return description != "" || len(sites) > 0 || bp.Address != "" || bp.Email != "" || len(cats) > 0 || len(hours) > 0
 }
-
 
 // mapsLink opens Google Maps on a business: on its coordinates when they
 // came, else on its address.

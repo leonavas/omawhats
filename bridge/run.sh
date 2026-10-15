@@ -7,11 +7,16 @@
 #
 # Usage: run.sh <data dir> <cache dir>
 set -uo pipefail
+# The session, the messages and the media are yours alone: folders 0700,
+# files 0600, also the ones an older version left readable.
+umask 077
 here="$(cd "$(dirname "$0")" && pwd)"
 data="$1"
 cache="$2"
 bindir="$data/bin"
-mkdir -p "$data"
+mkdir -p "$data" "$cache"
+chmod 700 "$data" "$cache"
+chmod 600 "$data"/*.db "$data"/*.db-* "$data"/bridge.log* 2>/dev/null
 # What the bridge (and its build) says goes to a log, kept short.
 log="$data/bridge.log"
 [ -f "$log" ] && [ "$(stat -c%s "$log")" -gt 5000000 ] && mv -f "$log" "$log.1"
@@ -30,7 +35,11 @@ if [ ! -x "$bin" ]; then
     echo '{"t":"build","state":"failed","error":"no_go"}'
     exit 3
   fi
-  if ! (cd "$here" && CGO_ENABLED=0 "${gocmd[@]}" build -trimpath -ldflags "-s -w" -o "$bin.tmp" .) >&2; then
+  # Go's module and build caches stay in our cache folder, so removing it
+  # leaves nothing behind (-modcacherw: Go's module cache is read-only
+  # otherwise, and rm -rf couldn't take it).
+  if ! (cd "$here" && CGO_ENABLED=0 GOMODCACHE="$cache/go/mod" GOCACHE="$cache/go/build" GOFLAGS=-modcacherw \
+        "${gocmd[@]}" build -trimpath -ldflags "-s -w" -o "$bin.tmp" .) >&2; then
     rm -f "$bin.tmp"
     echo '{"t":"build","state":"failed","error":"build"}'
     exit 3

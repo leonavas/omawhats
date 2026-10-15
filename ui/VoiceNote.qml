@@ -66,6 +66,7 @@ Item {
     width: vn.t.sp(42); height: vn.t.sp(26); radius: height / 2
     color: vn.t.alpha(vn.t.fg, 0.16)
     Text {
+      textFormat: Text.PlainText
       anchors.centerIn: parent
       text: (vn.wa.speed === 1 ? "1" : vn.wa.speed === 1.5 ? (vn.app.lang === "pt-BR" ? "1,5" : "1.5") : "2") + "×"
       color: vn.t.text
@@ -162,6 +163,7 @@ Item {
   }
 
   Text {
+    textFormat: Text.PlainText
     x: wave.x
     anchors.bottom: parent.bottom
     anchors.bottomMargin: vn.t.sp(2)

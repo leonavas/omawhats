@@ -78,6 +78,7 @@ Item {
     height: cv.t.sp(64)
     visible: !cv.archived
     Text {
+      textFormat: Text.PlainText
       x: cv.t.sp(20)
       anchors.verticalCenter: parent.verticalCenter
       text: "WhatsApp"
@@ -176,6 +177,7 @@ Item {
         }
         Icon { x: cv.t.sp(32); anchors.verticalCenter: parent.verticalCenter; name: "archive"; size: cv.t.sp(22); color: cv.t.accent }
         Text {
+          textFormat: Text.PlainText
           x: cv.t.sp(84)
           anchors.verticalCenter: parent.verticalCenter
           text: cv.app.tr("Archived", "Arquivadas")
@@ -184,6 +186,7 @@ Item {
           font.pixelSize: cv.t.fsName
         }
         Text {
+          textFormat: Text.PlainText
           anchors.right: parent.right
           anchors.rightMargin: cv.t.sp(28)
           anchors.verticalCenter: parent.verticalCenter
@@ -197,6 +200,7 @@ Item {
         MouseArea { id: ama; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: cv.win.sideView = "archived" }
       }
       Text {
+        textFormat: Text.PlainText
         visible: cv.archived
         width: parent.width
         padding: cv.t.sp(20)
@@ -228,10 +232,12 @@ Item {
         visible: cv.wa.everReady && list.count > 0
         Icon { name: "lock"; size: cv.t.sp(12); color: cv.t.faint; anchors.verticalCenter: parent.verticalCenter }
         Text {
+          textFormat: Text.PlainText
           text: cv.app.tr("Your personal messages are ", "Suas mensagens pessoais são ")
           color: cv.t.faint; font.family: cv.t.font; font.pixelSize: cv.t.fsSmall
         }
         Text {
+          textFormat: Text.PlainText
           text: cv.app.tr("end-to-end encrypted", "protegidas com a criptografia de ponta a ponta")
           color: cv.t.accent; font.family: cv.t.font; font.pixelSize: cv.t.fsSmall
         }
@@ -240,6 +246,7 @@ Item {
 
     // Empty filters say so.
     Text {
+      textFormat: Text.PlainText
       anchors.centerIn: parent
       width: parent.width - cv.t.sp(60)
       visible: list.count === 0 && cv.wa.everReady && cv.filter !== "all"

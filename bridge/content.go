@@ -40,7 +40,7 @@ func contentOf(m *waE2E.Message) (Content, bool) {
 		x := m.GetExtendedTextMessage()
 		c := Content{Kind: "text", Text: x.GetText()}
 		if x.GetTitle() != "" || x.GetDescription() != "" {
-			url := x.GetMatchedText()
+			url := webURL(x.GetMatchedText())
 			if url == "" {
 				url = firstURL(x.GetText())
 			}
@@ -74,7 +74,7 @@ func contentOf(m *waE2E.Message) (Content, bool) {
 			kind = "live_location"
 		}
 		return Content{Kind: kind, Text: x.GetComment(), Thumb: x.GetJPEGThumbnail(), X: map[string]any{"loc": map[string]any{
-			"lat": x.GetDegreesLatitude(), "lon": x.GetDegreesLongitude(), "name": x.GetName(), "addr": x.GetAddress(), "url": x.GetURL(),
+			"lat": x.GetDegreesLatitude(), "lon": x.GetDegreesLongitude(), "name": x.GetName(), "addr": x.GetAddress(), "url": webURL(x.GetURL()),
 		}}}, true
 	case m.GetLiveLocationMessage() != nil:
 		x := m.GetLiveLocationMessage()
@@ -163,6 +163,17 @@ func pollOf(m *waE2E.Message) *waE2E.PollCreationMessage {
 }
 
 // firstURL is the first http(s) link in text.
+// webURL is a link its sender attached, kept only when a browser opens it
+// (http or https): any other scheme could hand a file or a command to
+// whatever handles it.
+func webURL(s string) string {
+	s = strings.TrimSpace(s)
+	if l := strings.ToLower(s); strings.HasPrefix(l, "https://") || strings.HasPrefix(l, "http://") {
+		return s
+	}
+	return ""
+}
+
 func firstURL(text string) string {
 	for _, w := range strings.Fields(text) {
 		if strings.HasPrefix(w, "http://") || strings.HasPrefix(w, "https://") {

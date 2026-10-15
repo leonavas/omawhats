@@ -43,6 +43,7 @@ Rectangle {
       onClicked: { if (ip.view === "media") ip.win.infoView = ""; else ip.win.infoOpen = false }
     }
     Text {
+      textFormat: Text.PlainText
       anchors.left: closeBtn.right
       anchors.leftMargin: ip.t.sp(14)
       anchors.verticalCenter: parent.verticalCenter
@@ -77,6 +78,7 @@ Rectangle {
     Rectangle { anchors.fill: parent; anchors.leftMargin: ip.t.sp(10); anchors.rightMargin: ip.t.sp(10); radius: ip.t.sp(10); color: rma.containsMouse ? ip.t.hover : "transparent" }
     Icon { x: ip.t.sp(28); anchors.verticalCenter: parent.verticalCenter; name: r2.icon; size: ip.t.sp(22); color: r2.danger ? ip.t.danger : ip.t.icon }
     Text {
+      textFormat: Text.PlainText
       x: ip.t.sp(70)
       anchors.verticalCenter: parent.verticalCenter
       width: parent.width - x - ip.t.sp(90)
@@ -91,7 +93,7 @@ Rectangle {
       anchors.rightMargin: ip.t.sp(24)
       anchors.verticalCenter: parent.verticalCenter
       spacing: ip.t.sp(4)
-      Text { text: r2.value; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText; anchors.verticalCenter: parent.verticalCenter }
+      Text { textFormat: Text.PlainText; text: r2.value; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText; anchors.verticalCenter: parent.verticalCenter }
       Icon { visible: r2.chevron; name: "chevronRight"; size: ip.t.sp(20); color: ip.t.dim; anchors.verticalCenter: parent.verticalCenter }
     }
     MouseArea { id: rma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: r2.clicked() }
@@ -104,7 +106,7 @@ Rectangle {
     property string icon: ""
     width: parent ? parent.width - parent.leftPadding - parent.rightPadding : 0
     height: ip.t.sp(22)
-    Text { anchors.verticalCenter: parent.verticalCenter; text: tt.text; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
+    Text { textFormat: Text.PlainText; anchors.verticalCenter: parent.verticalCenter; text: tt.text; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
     Icon { visible: tt.icon !== ""; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; name: tt.icon; size: ip.t.sp(18); color: ip.t.dim }
   }
   // A square button under the name: search, message.
@@ -121,7 +123,7 @@ Rectangle {
       anchors.centerIn: parent
       spacing: ip.t.sp(4)
       Icon { anchors.horizontalCenter: parent.horizontalCenter; name: act.icon; size: ip.t.sp(22); color: ip.t.accent }
-      Text { anchors.horizontalCenter: parent.horizontalCenter; text: act.label; color: ip.t.text; font.family: ip.t.font; font.pixelSize: ip.t.fsSmall + 1 }
+      Text { textFormat: Text.PlainText; anchors.horizontalCenter: parent.horizontalCenter; text: act.label; color: ip.t.text; font.family: ip.t.font; font.pixelSize: ip.t.fsSmall + 1 }
     }
     MouseArea { id: ama; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: act.clicked() }
   }
@@ -182,6 +184,7 @@ Rectangle {
             textFormat: Text.PlainText
           }
           Text {
+            textFormat: Text.PlainText
             width: parent.width - ip.t.sp(40)
             anchors.horizontalCenter: parent.horizontalCenter
             horizontalAlignment: Text.AlignHCenter
@@ -193,6 +196,7 @@ Rectangle {
             font.pixelSize: ip.t.fsName - 1
           }
           Text {
+            textFormat: Text.PlainText
             width: parent.width - ip.t.sp(40)
             anchors.horizontalCenter: parent.horizontalCenter
             horizontalAlignment: Text.AlignHCenter
@@ -203,6 +207,7 @@ Rectangle {
             font.pixelSize: ip.t.fsText
           }
           Text {
+            textFormat: Text.PlainText
             width: parent.width - ip.t.sp(40)
             anchors.horizontalCenter: parent.horizontalCenter
             horizontalAlignment: Text.AlignHCenter
@@ -218,10 +223,11 @@ Rectangle {
             visible: !!ip.op
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: ip.t.sp(5)
-            Text { text: ip.op && ip.op.open ? ip.app.tr("Open", "Aberta") : ip.app.tr("Closed", "Fechada"); color: ip.op && ip.op.open ? ip.t.online : ip.t.danger; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
-            Text { visible: text !== ""; text: ip.op ? ip.op.next : ""; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
+            Text { textFormat: Text.PlainText; text: ip.op && ip.op.open ? ip.app.tr("Open", "Aberta") : ip.app.tr("Closed", "Fechada"); color: ip.op && ip.op.open ? ip.t.online : ip.t.danger; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
+            Text { textFormat: Text.PlainText; visible: text !== ""; text: ip.op ? ip.op.next : ""; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
           }
           Text {
+            textFormat: Text.PlainText
             width: parent.width - ip.t.sp(40)
             anchors.horizontalCenter: parent.horizontalCenter
             horizontalAlignment: Text.AlignHCenter
@@ -276,6 +282,7 @@ Rectangle {
             onLinkActivated: url => ip.app.openUrl(url)
           }
           Text {
+            textFormat: Text.PlainText
             visible: !ip.p || !ip.p.about || ip.p.about.trim() === ""
             text: ip.app.tr("No description", "Sem descrição")
             color: ip.t.faint
@@ -283,6 +290,7 @@ Rectangle {
             font.pixelSize: ip.t.fsName - 1
           }
           Text {
+            textFormat: Text.PlainText
             visible: !!ip.p && !!ip.p.created
             width: parent.width - ip.t.sp(60)
             wrapMode: Text.Wrap
@@ -309,12 +317,13 @@ Rectangle {
           readonly property real inner: width - leftPadding - rightPadding
           readonly property bool empty: !!ip.p && !ip.p.description && !ip.op && !ip.p.address && !ip.p.maps && !ip.p.email && !(ip.p.website && ip.p.website.length)
           Title { text: ip.app.tr("Business account", "Conta comercial"); icon: "info" }
-          Text { visible: !!ip.p && !!ip.p.description; width: biz.inner; text: ip.p ? ip.p.description || "" : ""; color: ip.t.text; font.family: ip.t.font; font.pixelSize: ip.t.fsText; wrapMode: Text.Wrap }
+          Text { textFormat: Text.PlainText; visible: !!ip.p && !!ip.p.description; width: biz.inner; text: ip.p ? ip.p.description || "" : ""; color: ip.t.text; font.family: ip.t.font; font.pixelSize: ip.t.fsText; wrapMode: Text.Wrap }
           Item {
             visible: !!ip.op
             width: biz.inner
             height: ip.t.sp(24)
             Text {
+              textFormat: Text.PlainText
               anchors.verticalCenter: parent.verticalCenter
               text: !ip.op ? "" : ip.op.always ? ip.app.tr("Open 24 hours", "Aberta 24 horas") : ip.op.open ? ip.app.tr("Open now", "Aberta agora") : ip.app.tr("Closed now", "Fechada agora")
               color: ip.op && ip.op.open ? ip.t.online : ip.t.danger
@@ -325,7 +334,7 @@ Rectangle {
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               spacing: ip.t.sp(4)
-              Text { anchors.verticalCenter: parent.verticalCenter; text: ip.op && !ip.op.always ? H.dayHours(ip.p.hours, ip.op.day, ip.app.lang) : ""; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
+              Text { textFormat: Text.PlainText; anchors.verticalCenter: parent.verticalCenter; text: ip.op && !ip.op.always ? H.dayHours(ip.p.hours, ip.op.day, ip.app.lang) : ""; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
               Icon { anchors.verticalCenter: parent.verticalCenter; name: ip.week ? "chevronUp" : "chevronDown"; size: ip.t.sp(20); color: ip.t.dim }
             }
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ip.week = !ip.week }
@@ -342,8 +351,8 @@ Rectangle {
                 readonly property bool today: !!ip.op && ip.op.day === day.index
                 width: parent.width
                 height: ip.t.sp(20)
-                Text { text: H.dayName(day.index, ip.app.lang); color: day.today ? ip.t.text : ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText; font.weight: day.today ? Font.Medium : Font.Normal }
-                Text { anchors.right: parent.right; text: ip.p && ip.p.hours ? H.dayHours(ip.p.hours, day.index, ip.app.lang) : ""; color: day.today ? ip.t.text : ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText; font.weight: day.today ? Font.Medium : Font.Normal }
+                Text { textFormat: Text.PlainText; text: H.dayName(day.index, ip.app.lang); color: day.today ? ip.t.text : ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText; font.weight: day.today ? Font.Medium : Font.Normal }
+                Text { textFormat: Text.PlainText; anchors.right: parent.right; text: ip.p && ip.p.hours ? H.dayHours(ip.p.hours, day.index, ip.app.lang) : ""; color: day.today ? ip.t.text : ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText; font.weight: day.today ? Font.Medium : Font.Normal }
               }
             }
           }
@@ -352,6 +361,7 @@ Rectangle {
             width: biz.inner
             spacing: ip.t.sp(4)
             Text {
+              textFormat: Text.PlainText
               visible: !!ip.p && !!ip.p.address
               width: parent.width
               text: ip.p ? (ip.p.address || "").trim() : ""
@@ -366,6 +376,7 @@ Rectangle {
               spacing: ip.t.sp(4)
               Icon { anchors.verticalCenter: parent.verticalCenter; name: "location"; size: ip.t.sp(16); color: ip.t.link }
               Text {
+                textFormat: Text.PlainText
                 text: ip.app.tr("Open in Google Maps", "Abrir no Google Maps")
                 color: ip.t.link
                 font.family: ip.t.font
@@ -374,14 +385,14 @@ Rectangle {
               }
             }
           }
-          Text { visible: !!ip.p && !!ip.p.email; text: ip.p ? ip.p.email || "" : ""; color: ip.t.link; font.family: ip.t.font; font.pixelSize: ip.t.fsText
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ip.app.openUrl("mailto:" + ip.p.email) } }
+          Text { textFormat: Text.PlainText; visible: !!ip.p && !!ip.p.email; text: ip.p ? ip.p.email || "" : ""; color: ip.t.link; font.family: ip.t.font; font.pixelSize: ip.t.fsText
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ip.app.openMail(ip.p.email) } }
           Repeater {
             model: ip.p && ip.p.website ? ip.p.website : []
-            delegate: Text { required property var modelData; width: Math.min(implicitWidth, biz.inner); elide: Text.ElideRight; text: modelData; color: ip.t.link; font.family: ip.t.font; font.pixelSize: ip.t.fsText
+            delegate: Text { textFormat: Text.PlainText; required property var modelData; width: Math.min(implicitWidth, biz.inner); elide: Text.ElideRight; text: modelData; color: ip.t.link; font.family: ip.t.font; font.pixelSize: ip.t.fsText
               MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ip.app.openUrl(/^https?:\/\//.test(modelData) ? modelData : "https://" + modelData) } }
           }
-          Text { visible: biz.empty; text: ip.app.tr("This is a business account.", "Esta é uma conta comercial."); color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
+          Text { textFormat: Text.PlainText; visible: biz.empty; text: ip.app.tr("This is a business account.", "Esta é uma conta comercial."); color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText }
         }
         Gap { visible: biz.visible }
 
@@ -454,6 +465,7 @@ Rectangle {
           width: parent.width
           visible: ip.group && !!ip.p && !!ip.p.members
           Text {
+            textFormat: Text.PlainText
             leftPadding: ip.t.sp(30)
             topPadding: ip.t.sp(16)
             bottomPadding: ip.t.sp(8)
@@ -485,6 +497,7 @@ Rectangle {
           width: parent.width
           visible: !ip.group && !!ip.p && !!ip.p.common && ip.p.common.length > 0
           Text {
+            textFormat: Text.PlainText
             leftPadding: ip.t.sp(30)
             topPadding: ip.t.sp(16)
             bottomPadding: ip.t.sp(8)
@@ -546,7 +559,7 @@ Rectangle {
             width: parent.width - ip.t.sp(52)
             anchors.verticalCenter: parent.verticalCenter
             spacing: ip.t.sp(3)
-            Text { text: U.listTime(modelData.ts, ip.app.lang, ip.app.clock24); color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsSmall }
+            Text { textFormat: Text.PlainText; text: U.listTime(modelData.ts, ip.app.lang, ip.app.clock24); color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsSmall }
             Text {
               width: parent.width
               elide: Text.ElideRight
@@ -560,6 +573,7 @@ Rectangle {
           MouseArea { id: rma2; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: ip.wa.open(ip.chat, { msg: modelData.id }) }
         }
         Text {
+          textFormat: Text.PlainText
           anchors.centerIn: parent
           visible: parent.count === 0
           width: parent.width - ip.t.sp(60)
@@ -652,14 +666,15 @@ Rectangle {
             width: parent.width - ip.t.sp(32)
             spacing: ip.t.sp(4)
             readonly property string url: F.firstLink(modelData.text)
-            Text { width: parent.width; text: parent.url; color: ip.t.link; font.family: ip.t.font; font.pixelSize: ip.t.fsText; elide: Text.ElideRight
+            Text { textFormat: Text.PlainText; width: parent.width; text: parent.url; color: ip.t.link; font.family: ip.t.font; font.pixelSize: ip.t.fsText; elide: Text.ElideRight
               MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ip.app.openUrl(parent.parent.url) } }
-            Text { width: parent.width; text: F.plain(modelData.text); color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsSmall + 1; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
+            Text { textFormat: Text.PlainText; width: parent.width; text: F.plain(modelData.text); color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsSmall + 1; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
           }
         }
       }
       BusyIndicator { anchors.centerIn: parent; running: mv.items === null; visible: running }
       Text {
+        textFormat: Text.PlainText
         anchors.centerIn: parent
         visible: mv.items !== null && mv.items.length === 0
         text: mv.tab === "media" ? ip.app.tr("No media", "Nenhuma mídia") : mv.tab === "docs" ? ip.app.tr("No documents", "Nenhum documento") : ip.app.tr("No links", "Nenhum link")

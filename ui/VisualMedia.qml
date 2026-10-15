@@ -80,7 +80,7 @@ Item {
     color: Qt.rgba(0, 0, 0, 0.5)
     BusyIndicator { anchors.centerIn: parent; running: vm.state_ === "busy"; visible: running; width: vm.t.sp(40); height: width }
     Icon { anchors.centerIn: parent; visible: vm.state_ !== "busy" && !vm.gif; name: vm.state_ === "failed" ? "refresh" : "play"; size: vm.t.sp(30); color: "white" }
-    Text { anchors.centerIn: parent; visible: vm.state_ !== "busy" && vm.gif; text: "GIF"; color: "white"; font.family: vm.t.font; font.pixelSize: vm.t.fsSmall + 1; font.weight: Font.Bold }
+    Text { textFormat: Text.PlainText; anchors.centerIn: parent; visible: vm.state_ !== "busy" && vm.gif; text: "GIF"; color: "white"; font.family: vm.t.font; font.pixelSize: vm.t.fsSmall + 1; font.weight: Font.Bold }
   }
   Row {
     visible: vm.isVideo && !vm.gif && (vm.media.secs || 0) > 0
@@ -89,7 +89,7 @@ Item {
     anchors.margins: vm.t.sp(8)
     spacing: vm.t.sp(4)
     Icon { name: "videoFilled"; size: vm.t.sp(16); color: "white"; anchors.verticalCenter: parent.verticalCenter }
-    Text { text: U.duration(vm.media.secs); color: "white"; font.family: vm.t.font; font.pixelSize: vm.t.fsMeta; anchors.verticalCenter: parent.verticalCenter; style: Text.Raised; styleColor: Qt.rgba(0, 0, 0, 0.4) }
+    Text { textFormat: Text.PlainText; text: U.duration(vm.media.secs); color: "white"; font.family: vm.t.font; font.pixelSize: vm.t.fsMeta; anchors.verticalCenter: parent.verticalCenter; style: Text.Raised; styleColor: Qt.rgba(0, 0, 0, 0.4) }
   }
 
   MouseArea {

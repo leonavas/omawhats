@@ -1,6 +1,18 @@
-omawhats
 Copyright 2026 Rodrigo Leonavas
 
 This product is an unofficial WhatsApp client. It is not affiliated with,
 endorsed by or sponsored by WhatsApp LLC or Meta Platforms, Inc.
 "WhatsApp" is a trademark of WhatsApp LLC.
+
+Third-party data included:
+
+- lib/EmojiData.js: emoji names and order from emoji-data
+  (https://github.com/iamcal/emoji-data), Copyright (c) 2013 Cal Henderson,
+  MIT License.
+- lib/EmojiPt.js: Portuguese emoji names and keywords from the Unicode CLDR
+  (https://cldr.unicode.org), Copyright (c) 1991-2026 Unicode, Inc.,
+  Unicode License v3 (https://www.unicode.org/license.txt).
+
+Built from source on first run, not included (see bridge/go.mod):
+whatsmeow (https://github.com/tulir/whatsmeow), Mozilla Public License 2.0,
+and the Go modules it pulls in, each under its own license.

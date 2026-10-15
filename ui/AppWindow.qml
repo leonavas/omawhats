@@ -277,6 +277,7 @@ FloatingWindow {
       Behavior on opacity { NumberAnimation { duration: 180 } }
       Text {
         id: toastText
+        textFormat: Text.PlainText
         anchors.centerIn: parent
         width: Math.min(implicitWidth, toastBox.parent.width - appWin.t.sp(120))
         text: toastBox.text

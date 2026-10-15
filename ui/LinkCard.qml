@@ -63,6 +63,7 @@ Item {
         textFormat: Text.PlainText
       }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         text: lc.host
         color: lc.t.faint

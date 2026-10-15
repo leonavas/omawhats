@@ -116,8 +116,14 @@ func (b *Bridge) fetchAvatars() {
 	}
 }
 
+// picClient fetches profile pictures: a stalled server can't hold a worker.
+var picClient = &http.Client{Timeout: 60 * time.Second}
+
+// maxPicture is more than any profile picture WhatsApp serves.
+const maxPicture = 16 << 20
+
 func download(url, path string) error {
-	resp, err := http.Get(url)
+	resp, err := picClient.Get(url)
 	if err != nil {
 		return err
 	}
@@ -126,15 +132,19 @@ func download(url, path string) error {
 		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 	tmp := path + ".tmp"
-	f, err := os.Create(tmp)
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		f.Close()
+	n, err := io.Copy(f, io.LimitReader(resp.Body, maxPicture+1))
+	f.Close()
+	if err == nil && n > maxPicture {
+		err = errors.New("picture too large")
+	}
+	if err != nil {
+		os.Remove(tmp)
 		return err
 	}
-	f.Close()
 	return os.Rename(tmp, path)
 }
 

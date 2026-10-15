@@ -28,8 +28,13 @@ Item {
   readonly property bool auto: !!u.app && u.app.setting("updateCheck", true) !== false
   // Where an update leaves its note (.json), output (.log) and exit code
   // (.rc) for whichever copy of us is running once it's done: the restart
-  // replaces this one in the middle of it.
-  readonly property string base: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/omawhats-update"
+  // replaces this one in the middle of it. The session's runtime folder,
+  // else our own cache (0700); never the shared /tmp, where someone else
+  // could put those files first.
+  readonly property string base: {
+    var dir = Quickshell.env("XDG_RUNTIME_DIR") || (u.app ? u.app.cacheDir : "")
+    return dir ? dir + "/omawhats-update" : ""
+  }
   readonly property string folderIn: { try { return u.app ? decodeURIComponent(u.app.pluginDir) : "" } catch (e) { return u.app.pluginDir } }
 
   // This copy's version: what the shell loaded, else the manifest on disk.
@@ -159,20 +164,21 @@ Item {
   function update() {
     if (u.phase === "updated") { u.restart(); return }
     if (u.phase !== "available") return
-    if (u.how || !u.pluginId) { u.say(u.how || u.app.tr("Couldn't find where the plugin is installed", "Não foi possível achar onde o plugin está instalado")); return }
+    if (u.how || !u.pluginId || !u.base) { u.say(u.how || u.app.tr("Couldn't find where the plugin is installed", "Não foi possível achar onde o plugin está instalado")); return }
     u.phase = "updating"
     u.say(u.app.tr("Updating Omawhats to " + u.latest + " in the terminal… the shell then restarts and the window comes back",
                    "Atualizando o Omawhats para " + u.latest + " no terminal… depois o shell reinicia e a janela volta"))
     // In Omarchy's floating terminal, as the bar's system update runs: the
-    // script goes beside the note, out of the folder the update rewrites.
-    // The exit code is written once the restart is over, so the new copy
-    // is the one that reads it; when nothing changed (up to date,
-    // cancelled, or it failed) there's no restart and this copy reads it.
+    // script goes in as `bash -c`, never through a file, out of the folder
+    // the update rewrites. The exit code is written once the restart is
+    // over, so the new copy is the one that reads it; when nothing changed
+    // (up to date, cancelled, or it failed) there's no restart and this
+    // copy reads it.
     run.command = ["setsid", "-f", "-w", "sh", "-c",
-      'b=$2; printf "%s\\n" "$3" >"$b.json"; rm -f "$b.rc" "$b.log"; printf "%s\\n" "$4" >"$b.sh"\n' +
+      'umask 077; b=$2; printf "%s\\n" "$3" >"$b.json" || exit 0; rm -f "$b.rc" "$b.log" "$b.sh"\n' +
       'command -v omarchy-launch-floating-terminal-with-presentation >/dev/null 2>&1 || PATH=$PATH:${OMARCHY_PATH:-/usr/share/omarchy}/bin\n' +
       'command -v omarchy-launch-floating-terminal-with-presentation >/dev/null 2>&1 || { echo "no omarchy-launch-floating-terminal-with-presentation" >"$b.log"; echo 127 >"$b.rc"; exit 0; }\n' +
-      'exec omarchy-launch-floating-terminal-with-presentation "$(printf "bash %q %q %q %q %q %q" "$b.sh" "$1" "$b" "$5" "$6" "$7")"',
+      'exec omarchy-launch-floating-terminal-with-presentation "$(printf "bash -c %q omawhats-update %q %q %q %q %q" "$4" "$1" "$b" "$5" "$6" "$7")"',
       "omawhats-update", u.pluginId, u.base, u.note(u.latest), u.script, u.version, u.latest, u.folder]
     run.running = true
     pickupTimer.restart()
@@ -214,7 +220,7 @@ Item {
   // On disk but not loaded: restart the shell, and the new copy says so.
   function restart() {
     Quickshell.execDetached(["setsid", "-f", "sh", "-c",
-      'printf "%s\\n" "$2" >"$1.json"; : >"$1.log"; rm -f "$1.rc"\n' +
+      'umask 077; [ -n "$1" ] || exit 0; printf "%s\\n" "$2" >"$1.json"; : >"$1.log"; rm -f "$1.rc"\n' +
       'command -v omarchy-restart-shell >/dev/null 2>&1 || PATH=$PATH:${OMARCHY_PATH:-/usr/share/omarchy}/bin\n' +
       'omarchy-restart-shell >>"$1.log" 2>&1; echo $? >"$1.rc"',
       "omawhats-restart", u.base, u.note(u.latest)])
@@ -229,7 +235,7 @@ Item {
   Process {
     id: pickup
     command: ["sh", "-c",
-      'b=$1; [ -f "$b.json" ] || exit 3; now=$(date +%s)\n' +
+      'b=$1; [ -n "$b" ] && [ -f "$b.json" ] || exit 3; now=$(date +%s)\n' +
       'if [ ! -f "$b.rc" ]; then [ $((now - $(stat -c %Y "$b.json"))) -lt 600 ] && exit 5; rm -f "$b.json" "$b.log"; exit 3; fi\n' +
       '[ $((now - $(stat -c %Y "$b.rc"))) -ge 2 ] || exit 4\n' +
       'head -n 1 "$b.json"; head -n 1 "$b.rc"; tail -n 20 "$b.log" 2>/dev/null; rm -f "$b.json" "$b.rc" "$b.log" "$b.sh"',

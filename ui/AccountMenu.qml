@@ -229,6 +229,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           spacing: d.t.sp(3)
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             text: d.myName
             color: d.t.textBright
@@ -254,6 +255,7 @@ Item {
               color: d.t.dim
             }
             Text {
+              textFormat: Text.PlainText
               width: parent.width - d.t.sp(20)
               anchors.verticalCenter: parent.verticalCenter
               text: d.line.text
@@ -304,6 +306,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 1
                 Text {
+                  textFormat: Text.PlainText
                   width: parent.width
                   text: ir.it.label
                   color: ir.ink
@@ -313,6 +316,7 @@ Item {
                   elide: Text.ElideRight
                 }
                 Text {
+                  textFormat: Text.PlainText
                   visible: !!ir.it.sub2
                   width: parent.width
                   text: ir.it.sub2 || ""
@@ -333,6 +337,7 @@ Item {
                 Icon { visible: !!ir.it.notif && d.paused; anchors.verticalCenter: parent.verticalCenter; name: "muted"; size: d.t.sp(16); color: d.t.warning }
                 Icon { visible: !!ir.it.notif; anchors.verticalCenter: parent.verticalCenter; name: "chevronRight"; size: d.t.sp(20); color: d.t.dim }
                 Text {
+                  textFormat: Text.PlainText
                   visible: !ir.it.notif && !!ir.it.hint
                   anchors.verticalCenter: parent.verticalCenter
                   text: ir.it.hint || ""
@@ -394,6 +399,7 @@ Item {
               bottomPadding: d.t.sp(6)
               Icon { visible: !!srow.modelData.warn; anchors.verticalCenter: parent.verticalCenter; name: "muted"; size: d.t.sp(16); color: d.t.warning }
               Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 text: srow.modelData.head
                 color: srow.modelData.warn ? d.t.warning : d.t.dim
@@ -411,6 +417,7 @@ Item {
               radius: d.t.sp(8)
               color: sr.hot ? d.t.hoverStrong : "transparent"
               Text {
+                textFormat: Text.PlainText
                 anchors.left: parent.left
                 anchors.leftMargin: d.t.sp(12)
                 anchors.verticalCenter: parent.verticalCenter
@@ -420,6 +427,7 @@ Item {
                 font.pixelSize: d.t.fsText
               }
               Text {
+                textFormat: Text.PlainText
                 anchors.right: parent.right
                 anchors.rightMargin: d.t.sp(12)
                 anchors.verticalCenter: parent.verticalCenter

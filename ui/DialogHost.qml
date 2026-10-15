@@ -72,6 +72,7 @@ Item {
     border.color: host.t.line
     MouseArea { anchors.fill: parent; onPressed: host.commitEdits() }
     Text {
+      textFormat: Text.PlainText
       visible: fr.title !== ""
       x: host.t.sp(24)
       y: host.t.sp(22)
@@ -108,6 +109,7 @@ Item {
     border.color: host.t.lineStrong
     Text {
       id: lbl
+      textFormat: Text.PlainText
       anchors.centerIn: parent
       text: bt.label
       color: bt.primary ? host.t.onColor(bt.danger ? host.t.danger : host.t.accent) : (bt.danger ? host.t.danger : host.t.accent)
@@ -140,7 +142,7 @@ Item {
       Column {
         width: parent.width
         spacing: host.t.sp(24)
-        Text { width: parent.width; text: cfr.spec.text; color: host.t.dim; font.family: host.t.font; font.pixelSize: host.t.fsText; wrapMode: Text.Wrap }
+        Text { textFormat: Text.PlainText; width: parent.width; text: cfr.spec.text; color: host.t.dim; font.family: host.t.font; font.pixelSize: host.t.fsText; wrapMode: Text.Wrap }
         Row {
           anchors.right: parent.right
           spacing: host.t.sp(10)
@@ -228,6 +230,7 @@ Item {
           width: parent.width
           height: host.t.sp(44)
           Text {
+            textFormat: Text.PlainText
             anchors.left: parent.left
             anchors.right: sendFwd.left
             anchors.verticalCenter: parent.verticalCenter
@@ -303,8 +306,8 @@ Item {
             visible: sf.kindOf !== "image"
             spacing: host.t.sp(12)
             Icon { anchors.horizontalCenter: parent.horizontalCenter; name: sf.kindOf === "video" ? "videoFilled" : sf.kindOf === "audio" ? "headphones" : "documentFilled"; size: host.t.sp(72); color: host.t.faint }
-            Text { anchors.horizontalCenter: parent.horizontalCenter; text: U.basename(sf.currentPath); color: host.t.text; font.family: host.t.font; font.pixelSize: host.t.fsText }
-            Text { anchors.horizontalCenter: parent.horizontalCenter; text: sf.kindOf === "document" ? host.app.tr("Sent as a document", "Enviado como documento") : ""; color: host.t.dim; font.family: host.t.font; font.pixelSize: host.t.fsSmall }
+            Text { textFormat: Text.PlainText; anchors.horizontalCenter: parent.horizontalCenter; text: U.basename(sf.currentPath); color: host.t.text; font.family: host.t.font; font.pixelSize: host.t.fsText }
+            Text { textFormat: Text.PlainText; anchors.horizontalCenter: parent.horizontalCenter; text: sf.kindOf === "document" ? host.app.tr("Sent as a document", "Enviado como documento") : ""; color: host.t.dim; font.family: host.t.font; font.pixelSize: host.t.fsSmall }
           }
         }
         // The files, when there are several.
@@ -349,7 +352,7 @@ Item {
               clip: true
               Component.onCompleted: forceActiveFocus()
               Keys.onReturnPressed: sf.send()
-              Text { anchors.fill: parent; verticalAlignment: Text.AlignVCenter; visible: !cap.text; text: host.app.tr("Add a caption", "Adicione uma legenda"); color: host.t.faint; font: cap.font }
+              Text { textFormat: Text.PlainText; anchors.fill: parent; verticalAlignment: Text.AlignVCenter; visible: !cap.text; text: host.app.tr("Add a caption", "Adicione uma legenda"); color: host.t.faint; font: cap.font }
             }
           }
           Rectangle {
@@ -527,6 +530,7 @@ Item {
       }
       Text {
         id: count
+        textFormat: Text.PlainText
         anchors.right: ok.left
         anchors.rightMargin: host.t.sp(4)
         y: input.y + Math.max(0, Math.round((host.t.sp(24) - height) / 2))
@@ -584,7 +588,7 @@ Item {
               radius: width / 2
               visible: host.wa.photoBusy
               color: host.t.alpha(host.t.bg, 0.6)
-              Text { anchors.centerIn: parent; text: "…"; color: host.t.textBright; font.family: host.t.font; font.pixelSize: host.t.fsName }
+              Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "…"; color: host.t.textBright; font.family: host.t.font; font.pixelSize: host.t.fsName }
             }
             // WhatsApp Web's menu on your photo: see it, upload one, remove it.
             MouseArea {
@@ -618,6 +622,7 @@ Item {
             // A business account's name is its business name, read-only
             // as on WhatsApp Web Business (it changes on the phone).
             Text {
+              textFormat: Text.PlainText
               visible: !!host.wa.me && !!host.wa.me.business
               text: host.app.tr("Business name", "Nome comercial")
               color: host.t.dim
@@ -637,6 +642,7 @@ Item {
             }
             Text {
               id: pfPhone
+              textFormat: Text.PlainText
               text: pf.phone
               color: phMa.containsMouse ? host.t.text : host.t.dim
               font.family: host.t.font
@@ -657,7 +663,7 @@ Item {
         Column {
           width: parent.width
           spacing: host.t.sp(6)
-          Text { text: host.app.tr("About", "Recado"); color: host.t.accent; font.family: host.t.font; font.pixelSize: host.t.fsText; font.weight: Font.Medium }
+          Text { textFormat: Text.PlainText; text: host.app.tr("About", "Recado"); color: host.t.accent; font.family: host.t.font; font.pixelSize: host.t.fsText; font.weight: Font.Medium }
           EditLine {
             width: parent.width
             value: pf.info && !pf.info.error ? (pf.info.about || "") : ""
@@ -696,6 +702,7 @@ Item {
           sourceSize.width: width * 2; sourceSize.height: height * 2
         }
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
           text: host.app.windowTitleBase
@@ -705,6 +712,7 @@ Item {
           font.weight: Font.Bold
         }
         Text {
+          textFormat: Text.PlainText
           visible: !!ab.up && !!ab.up.version
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
@@ -714,6 +722,7 @@ Item {
           font.pixelSize: host.t.fsSmall
         }
         Text {
+          textFormat: Text.PlainText
           readonly property bool busy: !!ab.up && ab.up.phase === "updating"
           visible: !!ab.up && ab.up.phase !== ""
           width: parent.width
@@ -729,6 +738,7 @@ Item {
         }
         Item { width: 1; height: host.t.sp(4) }
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
           text: ab.repo.replace("https://", "")
@@ -739,6 +749,7 @@ Item {
           MouseArea { id: abLink; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Qt.openUrlExternally(ab.repo) }
         }
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
           wrapMode: Text.Wrap
@@ -801,13 +812,13 @@ Item {
             required property var modelData
             width: (parent.width - host.t.sp(20)) / 2
             spacing: host.t.sp(10)
-            Text { width: parent.width * 0.55; text: modelData[1]; color: host.t.text; font.family: host.t.font; font.pixelSize: host.t.fsSmall + 1; wrapMode: Text.Wrap }
+            Text { textFormat: Text.PlainText; width: parent.width * 0.55; text: modelData[1]; color: host.t.text; font.family: host.t.font; font.pixelSize: host.t.fsSmall + 1; wrapMode: Text.Wrap }
             Rectangle {
               width: kt.implicitWidth + host.t.sp(12); height: kt.implicitHeight + host.t.sp(6); radius: host.t.sp(5)
               color: host.t.hover
               border.width: 1
               border.color: host.t.line
-              Text { id: kt; anchors.centerIn: parent; text: modelData[0]; color: host.t.dim; font.family: host.t.font; font.pixelSize: host.t.fsSmall }
+              Text { id: kt; textFormat: Text.PlainText; anchors.centerIn: parent; text: modelData[0]; color: host.t.dim; font.family: host.t.font; font.pixelSize: host.t.fsSmall }
             }
           }
         }

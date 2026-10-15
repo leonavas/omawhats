@@ -72,12 +72,14 @@ Rectangle {
       anchors.leftMargin: mv.t.sp(14)
       anchors.verticalCenter: parent.verticalCenter
       Text {
+        textFormat: Text.PlainText
         text: !mv.shown ? "" : mv.shown.from_me ? mv.app.tr("You", "Você") : (String(mv.shown.name || "").replace(/^~/, "") || mv.wa.nameOf(mv.shown.chat))
         color: mv.t.textBright
         font.family: mv.t.font
         font.pixelSize: mv.t.fsName
       }
       Text {
+        textFormat: Text.PlainText
         visible: !!mv.shown && mv.shown.ts > 0
         text: mv.shown && mv.shown.ts ? U.dayLabel(mv.shown.ts, mv.app.lang) + mv.app.tr(" at ", " às ") + U.clock(mv.shown.ts, mv.app.clock24) : ""
         color: mv.t.dim
@@ -189,6 +191,7 @@ Rectangle {
 
   Text {
     id: caption
+    textFormat: Text.PlainText
     anchors.bottom: strip.top
     anchors.bottomMargin: mv.t.sp(14)
     anchors.horizontalCenter: parent.horizontalCenter

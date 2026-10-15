@@ -124,6 +124,7 @@ Item {
         topPadding: b.visual ? b.t.sp(2) : 0
         Icon { name: "forward"; size: b.t.sp(15); color: b.t.faint; anchors.verticalCenter: parent.verticalCenter }
         Text {
+          textFormat: Text.PlainText
           text: b.m.fwd >= 5 ? b.app.tr("Forwarded many times", "Encaminhada com frequência") : b.app.tr("Forwarded", "Encaminhada")
           color: b.t.faint
           font.family: b.t.font
@@ -219,6 +220,7 @@ Item {
   // Messages of one to three emoji: large, no bubble.
   Text {
     id: jumboText
+    textFormat: Text.PlainText
     visible: b.jumbo
     text: b.m.text || ""
     font.family: b.t.emojiFont
@@ -454,6 +456,7 @@ Item {
         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: b.app.openUrl(parent.parent.url) }
       }
       Text {
+        textFormat: Text.PlainText
         visible: !!parent.loc.name || b.kind === "live_location"
         width: parent.width
         text: b.kind === "live_location" ? b.app.tr("Live location", "Localização em tempo real") : (parent.loc.name || "")
@@ -463,6 +466,7 @@ Item {
         wrapMode: Text.Wrap
       }
       Text {
+        textFormat: Text.PlainText
         visible: !!parent.loc.addr
         width: parent.width
         text: parent.loc.addr || ""
@@ -488,6 +492,7 @@ Item {
         bottomPadding: b.t.sp(10)
         Avatar { size: b.t.sp(46); jid: parent.parent.waPhone ? parent.parent.waPhone + "@s.whatsapp.net" : ""; name: parent.parent.first.name }
         Text {
+          textFormat: Text.PlainText
           anchors.verticalCenter: parent.verticalCenter
           width: b.t.sp(200)
           text: parent.parent.cs.length > 1 ? b.app.tr(parent.parent.first.name + " and " + (parent.parent.cs.length - 1) + " other contacts", parent.parent.first.name + " e mais " + (parent.parent.cs.length - 1) + " contatos") : parent.parent.first.name
@@ -503,6 +508,7 @@ Item {
         width: parent.width
         height: b.t.sp(40)
         Text {
+          textFormat: Text.PlainText
           anchors.centerIn: parent
           text: parent.parent.waPhone ? b.app.tr("Message", "Conversar") : (parent.parent.first.phones.length ? U.phone(parent.parent.first.phones[0].number) : "")
           color: b.t.accent
@@ -526,11 +532,11 @@ Item {
       readonly property var poll: b.x_.poll || { options: [] }
       property real natural: Math.min(b.innerMax, b.t.sp(320))
       spacing: b.t.sp(6)
-      Text { width: parent.width; text: b.m.text; color: b.t.textBright; font.family: b.t.font; font.pixelSize: b.t.fsMsg + 1; font.weight: Font.Medium; wrapMode: Text.Wrap; topPadding: b.t.sp(4) }
+      Text { textFormat: Text.PlainText; width: parent.width; text: b.m.text; color: b.t.textBright; font.family: b.t.font; font.pixelSize: b.t.fsMsg + 1; font.weight: Font.Medium; wrapMode: Text.Wrap; topPadding: b.t.sp(4) }
       Row {
         spacing: b.t.sp(4)
         Icon { name: parent.parent.poll.multi ? "checklist" : "check"; size: b.t.sp(14); color: b.t.faint; anchors.verticalCenter: parent.verticalCenter }
-        Text { text: parent.parent.poll.multi ? b.app.tr("Select one or more", "Selecione uma ou mais opções") : b.app.tr("Select one", "Selecione uma opção"); color: b.t.faint; font.family: b.t.font; font.pixelSize: b.t.fsSmall }
+        Text { textFormat: Text.PlainText; text: parent.parent.poll.multi ? b.app.tr("Select one or more", "Selecione uma ou mais opções") : b.app.tr("Select one", "Selecione uma opção"); color: b.t.faint; font.family: b.t.font; font.pixelSize: b.t.fsSmall }
       }
       Repeater {
         model: parent.poll.options
@@ -540,11 +546,12 @@ Item {
           topPadding: b.t.sp(4)
           bottomPadding: b.t.sp(4)
           Rectangle { width: b.t.sp(20); height: width; radius: parent.parent.poll.multi ? b.t.sp(4) : width / 2; color: "transparent"; border.width: 2; border.color: b.t.faint; anchors.verticalCenter: parent.verticalCenter }
-          Text { width: b.t.sp(250); text: modelData; color: b.t.text; font.family: b.t.font; font.pixelSize: b.t.fsMsg; wrapMode: Text.Wrap; anchors.verticalCenter: parent.verticalCenter }
+          Text { textFormat: Text.PlainText; width: b.t.sp(250); text: modelData; color: b.t.text; font.family: b.t.font; font.pixelSize: b.t.fsMsg; wrapMode: Text.Wrap; anchors.verticalCenter: parent.verticalCenter }
         }
       }
       Rectangle { width: parent.width; height: 1; color: b.t.line }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         horizontalAlignment: Text.AlignHCenter
         text: b.app.tr("Vote on your phone", "Vote pelo celular")
@@ -572,9 +579,9 @@ Item {
       Column {
         width: b.t.sp(220)
         spacing: b.t.sp(2)
-        Text { width: parent.width; text: parent.parent.ev.name || b.m.text; color: b.t.textBright; font.family: b.t.font; font.pixelSize: b.t.fsMsg; font.weight: Font.Medium; wrapMode: Text.Wrap; font.strikeout: !!parent.parent.ev.canceled }
-        Text { width: parent.width; visible: !!parent.parent.ev.start; text: parent.parent.ev.start ? U.longDate(parent.parent.ev.start, b.app.lang) + ", " + U.clock(parent.parent.ev.start, b.app.clock24) : ""; color: b.t.dim; font.family: b.t.font; font.pixelSize: b.t.fsSmall + 0.5 }
-        Text { width: parent.width; visible: !!parent.parent.ev.place; text: parent.parent.ev.place || ""; color: b.t.dim; font.family: b.t.font; font.pixelSize: b.t.fsSmall + 0.5; wrapMode: Text.Wrap }
+        Text { textFormat: Text.PlainText; width: parent.width; text: parent.parent.ev.name || b.m.text; color: b.t.textBright; font.family: b.t.font; font.pixelSize: b.t.fsMsg; font.weight: Font.Medium; wrapMode: Text.Wrap; font.strikeout: !!parent.parent.ev.canceled }
+        Text { textFormat: Text.PlainText; width: parent.width; visible: !!parent.parent.ev.start; text: parent.parent.ev.start ? U.longDate(parent.parent.ev.start, b.app.lang) + ", " + U.clock(parent.parent.ev.start, b.app.clock24) : ""; color: b.t.dim; font.family: b.t.font; font.pixelSize: b.t.fsSmall + 0.5 }
+        Text { textFormat: Text.PlainText; width: parent.width; visible: !!parent.parent.ev.place; text: parent.parent.ev.place || ""; color: b.t.dim; font.family: b.t.font; font.pixelSize: b.t.fsSmall + 0.5; wrapMode: Text.Wrap }
       }
     }
   }
@@ -594,8 +601,9 @@ Item {
       }
       Column {
         anchors.verticalCenter: parent.verticalCenter
-        Text { text: parent.parent.s.text; color: b.t.text; font.family: b.t.font; font.pixelSize: b.t.fsMsg }
+        Text { textFormat: Text.PlainText; text: parent.parent.s.text; color: b.t.text; font.family: b.t.font; font.pixelSize: b.t.fsMsg }
         Text {
+          textFormat: Text.PlainText
           readonly property var c: b.x_.call || {}
           visible: !!c.secs
           text: U.duration(c.secs || 0)
@@ -617,8 +625,8 @@ Item {
       Column {
         anchors.verticalCenter: parent.verticalCenter
         width: b.t.sp(220)
-        Text { width: parent.width; text: parent.parent.inv.group || ""; color: b.t.textBright; font.family: b.t.font; font.pixelSize: b.t.fsMsg; font.weight: Font.Medium; elide: Text.ElideRight }
-        Text { width: parent.width; text: b.app.tr("WhatsApp group invite", "Convite para grupo do WhatsApp"); color: b.t.dim; font.family: b.t.font; font.pixelSize: b.t.fsSmall + 0.5 }
+        Text { textFormat: Text.PlainText; width: parent.width; text: parent.parent.inv.group || ""; color: b.t.textBright; font.family: b.t.font; font.pixelSize: b.t.fsMsg; font.weight: Font.Medium; elide: Text.ElideRight }
+        Text { textFormat: Text.PlainText; width: parent.width; text: b.app.tr("WhatsApp group invite", "Convite para grupo do WhatsApp"); color: b.t.dim; font.family: b.t.font; font.pixelSize: b.t.fsSmall + 0.5 }
       }
     }
   }
@@ -633,6 +641,7 @@ Item {
       Icon { name: b.kind === "view_once" ? "camera" : (parent.s.icon || "info"); size: b.t.sp(18); color: b.t.faint; anchors.verticalCenter: noteText.verticalCenter }
       Text {
         id: noteText
+        textFormat: Text.PlainText
         width: Math.min(implicitWidth, b.innerMax - b.t.sp(30) - (b.sideMeta ? meta.implicitWidth + b.t.sp(12) : 0))
         text: parent.s.text + (b.kind === "placeholder" ? b.app.tr(". This may take a while.", ". Isso pode levar alguns instantes.") : b.kind === "view_once" ? b.app.tr(" · open it on your phone", " · abra no seu celular") : b.kind === "unsupported" ? b.app.tr(" · see it on your phone", " · veja no seu celular") : "")
         color: b.t.dim
@@ -652,6 +661,7 @@ Item {
       spacing: b.t.sp(4)
       Text {
         id: titleText
+        textFormat: Text.PlainText
         visible: !!parent.card.title
         width: parent.width
         text: parent.card.title || ""
@@ -662,6 +672,7 @@ Item {
         wrapMode: Text.Wrap
       }
       Text {
+        textFormat: Text.PlainText
         visible: !!parent.card.footer
         width: parent.width
         text: parent.card.footer || ""
@@ -687,7 +698,7 @@ Item {
                 name: modelData.kind === "url" ? "openNew" : modelData.kind === "call" ? "call" : modelData.kind === "copy" ? "copy" : modelData.kind === "list" ? "listBullet" : "reply"
                 size: b.t.sp(18); color: b.t.accent; anchors.verticalCenter: parent.verticalCenter
               }
-              Text { text: modelData.text; color: b.t.accent; font.family: b.t.font; font.pixelSize: b.t.fsText; font.weight: Font.Medium; anchors.verticalCenter: parent.verticalCenter }
+              Text { textFormat: Text.PlainText; text: modelData.text; color: b.t.accent; font.family: b.t.font; font.pixelSize: b.t.fsText; font.weight: Font.Medium; anchors.verticalCenter: parent.verticalCenter }
             }
             MouseArea { anchors.fill: parent; enabled: !!modelData.url; cursorShape: Qt.PointingHandCursor; onClicked: b.app.openUrl(modelData.url) }
           }

@@ -136,6 +136,7 @@ Rectangle {
       Component {
         id: titleC
         Text {
+          textFormat: Text.PlainText
           x: ep.t.sp(16)
           text: parent.r.title
           color: ep.t.dim
@@ -155,7 +156,7 @@ Rectangle {
               required property var modelData
               width: grid.cell; height: grid.cell; radius: ep.t.sp(8)
               color: ema.containsMouse ? ep.t.hoverStrong : "transparent"
-              Text { anchors.centerIn: parent; text: modelData; font.family: ep.t.emojiFont; font.pixelSize: ep.t.sp(26) }
+              Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: modelData; font.family: ep.t.emojiFont; font.pixelSize: ep.t.sp(26) }
               MouseArea { id: ema; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: ep.choose(modelData) }
             }
           }
@@ -177,10 +178,11 @@ Rectangle {
         required property var modelData
         width: ep.t.sp(42); height: width; radius: ep.t.sp(8)
         color: fma.containsMouse ? ep.t.hoverStrong : "transparent"
-        Text { anchors.centerIn: parent; text: modelData; font.family: ep.t.emojiFont; font.pixelSize: ep.t.sp(26) }
+        Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: modelData; font.family: ep.t.emojiFont; font.pixelSize: ep.t.sp(26) }
         MouseArea { id: fma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: ep.choose(modelData) }
       }
       Text {
+        textFormat: Text.PlainText
         anchors.centerIn: parent
         visible: ep.found.length === 0
         text: ep.app.tr("No emoji found", "Nenhum emoji encontrado")
@@ -227,6 +229,7 @@ Rectangle {
         spacing: ep.t.sp(10)
         BusyIndicator { anchors.horizontalCenter: parent.horizontalCenter; running: ep.wa.stickers === null; visible: running }
         Text {
+          textFormat: Text.PlainText
           visible: ep.wa.stickers !== null
           text: ep.app.tr("Stickers you receive and favorite show up here", "As figurinhas que você recebe e favorita aparecem aqui")
           color: ep.t.dim

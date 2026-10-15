@@ -123,6 +123,7 @@ Item {
             Component {
               id: headC
               Text {
+                textFormat: Text.PlainText
                 text: row.modelData.header
                 color: menuLayer.t.dim
                 font.family: menuLayer.t.font
@@ -145,7 +146,7 @@ Item {
                     required property var modelData
                     width: menuLayer.t.sp(42); height: width; radius: width / 2
                     color: rma.containsMouse ? menuLayer.t.hoverStrong : (row.modelData.mine === modelData ? menuLayer.t.selected : "transparent")
-                    Text { anchors.centerIn: parent; text: parent.modelData; font.family: menuLayer.t.emojiFont; font.pixelSize: menuLayer.t.sp(26) }
+                    Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: parent.modelData; font.family: menuLayer.t.emojiFont; font.pixelSize: menuLayer.t.sp(26) }
                     MouseArea { id: rma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                       onClicked: { var f = row.modelData.action; var n = parent.modelData; menuLayer.close(); Qt.callLater(function() { f(n) }) } }
                   }
@@ -184,6 +185,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                   }
                   Text {
+                    textFormat: Text.PlainText
                     text: parent.parent.it.label
                     color: parent.parent.ink
                     font.family: menuLayer.t.font
@@ -192,6 +194,7 @@ Item {
                   }
                 }
                 Text {
+                  textFormat: Text.PlainText
                   anchors.right: parent.right
                   anchors.rightMargin: menuLayer.t.sp(12)
                   anchors.verticalCenter: parent.verticalCenter

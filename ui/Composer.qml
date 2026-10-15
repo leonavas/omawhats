@@ -327,7 +327,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           spacing: box.t.sp(8)
           Icon { name: "edit"; size: box.t.sp(18); color: box.t.accent; anchors.verticalCenter: parent.verticalCenter }
-          Text { text: box.app.tr("Editing message", "Editando mensagem"); color: box.t.accent; font.family: box.t.font; font.pixelSize: box.t.fsText; anchors.verticalCenter: parent.verticalCenter }
+          Text { textFormat: Text.PlainText; text: box.app.tr("Editing message", "Editando mensagem"); color: box.t.accent; font.family: box.t.font; font.pixelSize: box.t.fsText; anchors.verticalCenter: parent.verticalCenter }
         }
       }
       IconButton {
@@ -415,6 +415,7 @@ Item {
         onCursorPositionChanged: { box.checkMention(); box.checkEmoji() }
 
         Text {
+          textFormat: Text.PlainText
           visible: input.length === 0 && !input.preeditText
           anchors.fill: parent
           verticalAlignment: Text.AlignVCenter
@@ -485,6 +486,7 @@ Item {
         }
       }
       Text {
+        textFormat: Text.PlainText
         text: U.duration((box.recNow - box.recStart) / 1000)
         color: box.t.text
         font.family: box.t.font
@@ -492,6 +494,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
       }
       Text {
+        textFormat: Text.PlainText
         text: box.app.tr("Recording…", "Gravando…")
         color: box.t.dim
         font.family: box.t.font
@@ -593,6 +596,7 @@ Item {
           border.color: box.t.accent
         }
         Text {
+          textFormat: Text.PlainText
           anchors.centerIn: parent
           text: cellItem.modelData
           font.family: box.t.emojiFont

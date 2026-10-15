@@ -28,6 +28,7 @@ Item {
     y: tip.placement === "right" ? Math.round((tip.height - height) / 2) : (tip.placement === "above" ? -height - tip.t.sp(6) : tip.height + tip.t.sp(6))
     Text {
       id: label
+      textFormat: Text.PlainText
       anchors.centerIn: parent
       text: tip.text
       color: tip.t.bg

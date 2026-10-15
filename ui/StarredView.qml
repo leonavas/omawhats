@@ -49,6 +49,7 @@ Item {
           height: who.implicitHeight
           Text {
             id: who
+            textFormat: Text.PlainText
             width: parent.width - when.width - st.t.sp(10)
             elide: Text.ElideRight
             text: (m.from_me ? st.app.tr("You", "Você") : (m.name || "").replace(/^~/, "")) + "  ›  " + st.wa.nameOf(m.chat)
@@ -56,7 +57,7 @@ Item {
             font.family: st.t.font
             font.pixelSize: st.t.fsSmall + 1
           }
-          Text { id: when; anchors.right: parent.right; text: U.shortDate(m.ts, st.app.lang); color: st.t.faint; font.family: st.t.font; font.pixelSize: st.t.fsSmall }
+          Text { id: when; textFormat: Text.PlainText; anchors.right: parent.right; text: U.shortDate(m.ts, st.app.lang); color: st.t.faint; font.family: st.t.font; font.pixelSize: st.t.fsSmall }
         }
         Rectangle {
           width: Math.min(parent.width, body.implicitWidth + st.t.sp(20))
@@ -65,6 +66,7 @@ Item {
           color: m.from_me ? st.t.bubbleOut : st.t.bubbleIn
           Text {
             id: body
+            textFormat: Text.PlainText
             x: st.t.sp(10)
             y: st.t.sp(7)
             width: Math.min(implicitWidth, parent.parent.width - st.t.sp(20))
@@ -86,6 +88,7 @@ Item {
       spacing: st.t.sp(16)
       Icon { anchors.horizontalCenter: parent.horizontalCenter; name: "starFilled"; size: st.t.sp(56); color: st.t.faint }
       Text {
+        textFormat: Text.PlainText
         width: list.width - st.t.sp(80)
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap

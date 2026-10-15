@@ -62,6 +62,7 @@ Item {
   Component {
     id: headerC
     Text {
+      textFormat: Text.PlainText
       height: sr.t.sp(52)
       leftPadding: sr.t.sp(28)
       verticalAlignment: Text.AlignVCenter
@@ -98,6 +99,7 @@ Item {
   Component {
     id: noneC
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       padding: sr.t.sp(40)
       horizontalAlignment: Text.AlignHCenter
@@ -131,6 +133,7 @@ Item {
           height: chatName.implicitHeight
           Text {
             id: chatName
+            textFormat: Text.PlainText
             width: parent.width - date.width - sr.t.sp(8)
             text: sr.wa.nameOf(mr.m.chat)
             color: sr.t.textBright
@@ -140,6 +143,7 @@ Item {
           }
           Text {
             id: date
+            textFormat: Text.PlainText
             anchors.right: parent.right
             text: U.listTime(mr.m.ts, sr.app.lang, sr.app.clock24)
             color: sr.t.dim

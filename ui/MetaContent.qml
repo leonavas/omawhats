@@ -14,6 +14,7 @@ Row {
   height: t.sp(15)
   Icon { visible: !!mc.m.star; name: "starFilled"; size: mc.t.sp(12); color: mc.ink; anchors.verticalCenter: parent.verticalCenter }
   Text {
+    textFormat: Text.PlainText
     visible: !!mc.m.edited
     text: mc.app.tr("Edited", "Editada")
     color: mc.ink
@@ -23,6 +24,7 @@ Row {
     rightPadding: mc.t.sp(2)
   }
   Text {
+    textFormat: Text.PlainText
     text: U.clock(mc.m.ts, mc.app.clock24)
     color: mc.ink
     font.family: mc.t.font

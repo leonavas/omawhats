@@ -65,6 +65,7 @@ Column {
       width: dc.t.sp(30); height: dc.t.sp(38); radius: dc.t.sp(4)
       color: dc.badge
       Text {
+        textFormat: Text.PlainText
         anchors.bottom: parent.bottom
         anchors.bottomMargin: dc.t.sp(4)
         anchors.horizontalCenter: parent.horizontalCenter
@@ -92,6 +93,7 @@ Column {
         textFormat: Text.PlainText
       }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         text: [dc.media.pages ? (dc.media.pages === 1 ? dc.app.tr("1 page", "1 página") : dc.app.tr(dc.media.pages + " pages", dc.media.pages + " páginas")) : "",
                dc.ext, dc.media.size ? U.fileSize(dc.media.size, dc.app.lang) : ""].filter(function(s) { return s }).join(" • ")

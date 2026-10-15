@@ -83,6 +83,7 @@ Item {
           color: r.t.system
           Text {
             id: ut
+            textFormat: Text.PlainText
             anchors.centerIn: parent
             text: r.row.count === 1 ? r.app.tr("1 unread message", "1 mensagem não lida") : r.app.tr(r.row.count + " unread messages", r.row.count + " mensagens não lidas")
             color: r.t.text
@@ -204,9 +205,10 @@ Item {
           spacing: r.t.sp(2)
           Repeater {
             model: (mi.m.reactions || []).slice(0, 3)
-            delegate: Text { required property var modelData; text: modelData.emoji; font.family: r.t.emojiFont; font.pixelSize: r.t.sp(14) }
+            delegate: Text { textFormat: Text.PlainText; required property var modelData; text: modelData.emoji; font.family: r.t.emojiFont; font.pixelSize: r.t.sp(14) }
           }
           Text {
+            textFormat: Text.PlainText
             readonly property int total: (mi.m.reactions || []).reduce(function(s, x) { return s + x.count }, 0)
             visible: total > 1
             text: total

@@ -87,7 +87,7 @@ Item {
       width: badgeText.implicitWidth + pr.t.sp(14)
       radius: pr.t.sp(6)
       color: pr.t.chipOn
-      Text { id: badgeText; anchors.centerIn: parent; text: pr.badge; color: pr.t.chipOnText; font.family: pr.t.font; font.pixelSize: pr.t.fsSmall }
+      Text { id: badgeText; textFormat: Text.PlainText; anchors.centerIn: parent; text: pr.badge; color: pr.t.chipOnText; font.family: pr.t.font; font.pixelSize: pr.t.fsSmall }
     }
     Icon {
       id: check

@@ -228,6 +228,7 @@ Item {
       height: conv.t.sp(64)
       color: conv.t.panel
       Text {
+        textFormat: Text.PlainText
         anchors.centerIn: parent
         width: parent.width - conv.t.sp(40)
         horizontalAlignment: Text.AlignHCenter
@@ -254,6 +255,7 @@ Item {
         onClicked: conv.endSelect()
       }
       Text {
+        textFormat: Text.PlainText
         anchors.left: endBtn.right
         anchors.leftMargin: conv.t.sp(16)
         anchors.verticalCenter: parent.verticalCenter
@@ -314,7 +316,7 @@ Item {
       anchors.centerIn: parent
       spacing: conv.t.sp(14)
       Icon { anchors.horizontalCenter: parent.horizontalCenter; name: "attach"; size: conv.t.sp(56); color: conv.t.accent }
-      Text { text: conv.app.tr("Drop files here", "Solte os arquivos aqui"); color: conv.t.text; font.family: conv.t.font; font.pixelSize: conv.t.px(20) }
+      Text { textFormat: Text.PlainText; text: conv.app.tr("Drop files here", "Solte os arquivos aqui"); color: conv.t.text; font.family: conv.t.font; font.pixelSize: conv.t.px(20) }
     }
   }
 }

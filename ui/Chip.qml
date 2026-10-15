@@ -21,6 +21,7 @@ Rectangle {
     anchors.centerIn: parent
     spacing: c.t.sp(5)
     Text {
+      textFormat: Text.PlainText
       text: c.label
       color: c.on ? c.t.chipOnText : c.t.dim
       font.family: c.t.font
@@ -28,6 +29,7 @@ Rectangle {
       font.weight: Font.Medium
     }
     Text {
+      textFormat: Text.PlainText
       visible: c.count > 0
       text: c.count
       color: c.on ? c.t.chipOnText : c.t.faint
