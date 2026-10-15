@@ -1,9 +1,9 @@
-// whatsapp-claude-bridge: the WhatsApp side of the Omarchy WhatsApp app
-// (leonavas.whatsapp-claude). It speaks WhatsApp's multi-device protocol
+// omawhats-bridge: the WhatsApp side of the Omarchy WhatsApp app
+// (leonavas.omawhats). It speaks WhatsApp's multi-device protocol
 // through whatsmeow, as one more linked device, and talks to the app over
 // JSON lines: events on stdout, commands on stdin. Logs go to stderr.
 //
-// Usage: whatsapp-claude-bridge <data dir> <cache dir>
+// Usage: omawhats-bridge <data dir> <cache dir>
 package main
 
 import (
@@ -236,7 +236,7 @@ var cacheRoot string
 
 func main() {
 	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, "usage: whatsapp-claude-bridge <data dir> <cache dir>")
+		fmt.Fprintln(os.Stderr, "usage: omawhats-bridge <data dir> <cache dir>")
 		os.Exit(2)
 	}
 	dir := os.Args[1]

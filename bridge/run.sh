@@ -17,7 +17,7 @@ log="$data/bridge.log"
 [ -f "$log" ] && [ "$(stat -c%s "$log")" -gt 5000000 ] && mv -f "$log" "$log.1"
 exec 2>>"$log"
 hash=$(cat "$here"/*.go "$here/go.mod" "$here/go.sum" | sha256sum | cut -c1-16)
-bin="$bindir/whatsapp-claude-bridge-$hash"
+bin="$bindir/omawhats-bridge-$hash"
 
 if [ ! -x "$bin" ]; then
   echo '{"t":"build","state":"start"}'
@@ -36,7 +36,8 @@ if [ ! -x "$bin" ]; then
     exit 3
   fi
   mv "$bin.tmp" "$bin"
-  find "$bindir" -maxdepth 1 -name 'whatsapp-claude-bridge-*' ! -name "$(basename "$bin")" -delete
+  # The older builds go, the ones from before the rename too.
+  find "$bindir" -maxdepth 1 \( -name 'omawhats-bridge-*' -o -name 'whatsapp-claude-bridge-*' \) ! -name "$(basename "$bin")" -delete
   echo '{"t":"build","state":"done"}'
 fi
 

@@ -25,6 +25,13 @@ with Omarchy. It takes a minute or two, once per version. Everything else it
 uses (`mpv`, `ffmpeg`, `wl-clipboard`, `notify-send`, `xdg-open`,
 `omarchy-file-select`) comes with Omarchy too.
 
+Installed before 0.2.0, as `leonavas.whatsapp-claude`? Reinstall once instead
+of updating; your settings and the session move over on their own:
+
+```sh
+omarchy plugin remove leonavas.whatsapp-claude && omarchy plugin add https://github.com/leonavas/omawhats --enable
+```
+
 ## Screenshots
 
 | | |
@@ -74,10 +81,10 @@ off in Settings.
 
 ## Files
 
-- `~/.config/whatsapp-claude/settings.json`: settings and drafts.
-- `~/.local/share/whatsapp-claude/`: the session, the message store, avatars,
+- `~/.config/omawhats/settings.json`: settings and drafts.
+- `~/.local/share/omawhats/`: the session, the message store, avatars,
   the built bridge and its log.
-- `~/.cache/whatsapp-claude/`: downloaded media.
+- `~/.cache/omawhats/`: downloaded media.
 
 Log out from Settings (or unlink the device on your phone) to end the
 session. Your messages only travel between your machine and WhatsApp.
@@ -86,13 +93,13 @@ session. Your messages only travel between your machine and WhatsApp.
 
 ```sh
 git clone https://github.com/leonavas/omawhats
-ln -s "$PWD/omawhats" ~/.config/omarchy/plugins/leonavas.whatsapp-claude
+ln -s "$PWD/omawhats" ~/.config/omarchy/plugins/leonavas.omawhats
 omarchy-shell shell rescanPlugins
-omarchy plugin enable leonavas.whatsapp-claude --section right
+omarchy plugin enable leonavas.omawhats --section right
 ```
 
 The shell caches plugin QML, so reload edits with `omarchy-restart-shell`.
-IPC: `omarchy-shell whatsapp-claude toggle` (also `show`, `hide`,
+IPC: `omarchy-shell omawhats toggle` (also `show`, `hide`,
 `open <jid>`, `pause <minutes>`, `resume`, `status`).
 
 ## Disclaimer

@@ -17,7 +17,7 @@ import "lib/Format.js" as F
 // (Service.qml): it runs WhatsApp, the window and the notifications.
 BarWidget {
   id: root
-  moduleName: "leonavas.whatsapp-claude"
+  moduleName: "leonavas.omawhats"
 
   // ---------------------------------------------------------------- settings
   readonly property string iconStyle: String(setting("iconStyle", "Mono"))
@@ -60,7 +60,7 @@ BarWidget {
   property var service: null
   function findService() {
     var s = null
-    try { if (root.bar && root.bar.shell && typeof root.bar.shell.serviceFor === "function") s = root.bar.shell.serviceFor("leonavas.whatsapp-claude") } catch (e) { s = null }
+    try { if (root.bar && root.bar.shell && typeof root.bar.shell.serviceFor === "function") s = root.bar.shell.serviceFor("leonavas.omawhats") } catch (e) { s = null }
     if (!s) s = Registry.service
     root.service = s
   }

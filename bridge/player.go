@@ -70,7 +70,7 @@ func (p *Player) start() error {
 	if p.conn != nil {
 		return nil
 	}
-	sock := filepath.Join(os.TempDir(), fmt.Sprintf("whatsapp-claude-mpv-%d.sock", os.Getpid()))
+	sock := filepath.Join(os.TempDir(), fmt.Sprintf("omawhats-mpv-%d.sock", os.Getpid()))
 	os.Remove(sock)
 	cmd := exec.Command("mpv", "--idle=yes", "--no-video", "--no-config", "--no-terminal", "--really-quiet",
 		"--audio-display=no", "--input-ipc-server="+sock)

@@ -20,12 +20,12 @@ Item {
   property var shell: null
   property var manifest: null
 
-  readonly property string pluginId: "leonavas.whatsapp-claude"
+  readonly property string pluginId: "leonavas.omawhats"
   readonly property bool _registered: { Registry.service = root; return true }
   readonly property string home: Quickshell.env("HOME") || ""
-  readonly property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || home + "/.config") + "/whatsapp-claude"
-  readonly property string cacheDir: (Quickshell.env("XDG_CACHE_HOME") || home + "/.cache") + "/whatsapp-claude"
-  readonly property string dataDir: (Quickshell.env("XDG_DATA_HOME") || home + "/.local/share") + "/whatsapp-claude"
+  readonly property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || home + "/.config") + "/omawhats"
+  readonly property string cacheDir: (Quickshell.env("XDG_CACHE_HOME") || home + "/.cache") + "/omawhats"
+  readonly property string dataDir: (Quickshell.env("XDG_DATA_HOME") || home + "/.local/share") + "/omawhats"
   readonly property string downloadsDir: Quickshell.env("XDG_DOWNLOAD_DIR") || home + "/Downloads"
   readonly property string pluginDir: String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "").replace(/\/$/, "")
 
@@ -75,9 +75,10 @@ Item {
   readonly property bool autoPhotos: setting("autoPhotos", true) !== false
   function tr(en, pt) { return root.lang === "pt-BR" ? pt : en }
 
+  // Read once the folders are in place (`ready`, below).
   FileView {
     id: settingsFile
-    path: root.configDir + "/settings.json"
+    path: root.ready ? root.configDir + "/settings.json" : ""
     printErrors: false
     blockLoading: true
     onLoaded: {
@@ -129,7 +130,7 @@ Item {
   // starts it at login (Launch on Login) or on a click, and "Quit WhatsApp"
   // stops it, as whatsapp-tui's widget does with whatsapp-tui. Stopped,
   // nothing counts or notifies.
-  property bool running: Quickshell.env("WACLAUDE_OPEN") === "1"
+  property bool running: Quickshell.env("OMAWHATS_OPEN") === "1"
   property real startedAt: 0
   onRunningChanged: if (running) root.startedAt = Date.now() / 1000
   function start() { root.running = true }
@@ -139,7 +140,7 @@ Item {
   }
 
   // ---------------------------------------------------------------- window
-  property bool windowOpen: Quickshell.env("WACLAUDE_OPEN") === "1"
+  property bool windowOpen: Quickshell.env("OMAWHATS_OPEN") === "1"
   property bool windowFocused: false
   signal dialogRequested(string name, var args)
 
@@ -348,7 +349,8 @@ Item {
   }
   readonly property alias theme: themeObj
 
-  // The window is made once the app is complete (views read it at birth).
+  // The window is made once the app is complete and its folders are in
+  // place (views read it at birth).
   property bool ready: false
   LazyLoader {
     id: windowLoader
@@ -425,7 +427,7 @@ Item {
 
   function notify(chat, msg, title, body) {
     var avatar = U.unfileUrl(String(store.avatar(chat)).replace(/\?.*$/, ""))
-    var openArgv = ["omarchy-shell", "-q", "whatsapp-claude", "openAt", String(chat), String(msg || "")]
+    var openArgv = ["omarchy-shell", "-q", "omawhats", "openAt", String(chat), String(msg || "")]
     Quickshell.execDetached(["notify-send",
       "--app-name=WhatsApp",
       "--icon=" + (avatar || root.appIcon),
@@ -505,10 +507,23 @@ Item {
   }
 
   // ---------------------------------------------------------------- lifecycle
+  // The folders, made before anything reads or writes them. Omawhats was
+  // whatsapp-claude: each of its old folders (the session, the settings,
+  // the media) takes the new name once, by a rename, so nothing is copied
+  // or split. `mv -T` renames it only while the new one is missing or
+  // empty; one with something in it is left alone, and so is the old. The
+  // settings, the window and the bridge wait for it (`ready`).
+  Process {
+    id: folders
+    command: ["sh", "-c",
+      'for d in "$@"; do old=${d%/*}/whatsapp-claude; [ -d "$old" ] && mv -T "$old" "$d"; done; mkdir -p -m 700 "$@"; exit 0',
+      "folders", root.configDir, root.cacheDir, root.dataDir]
+    onExited: root.ready = true
+  }
+
   Component.onCompleted: {
-    Quickshell.execDetached(["mkdir", "-p", "-m", "700", root.configDir, root.cacheDir, root.dataDir])
+    folders.running = true
     Registry.service = root
-    root.ready = true
     // Pasted pictures and voice notes recorded: a day is enough.
     Quickshell.execDetached(["sh", "-c", 'find "$1/paste" "$1/voice" -type f -mtime +1 -delete 2>/dev/null; exit 0', "clean", root.cacheDir])
   }
@@ -519,7 +534,7 @@ Item {
   }
 
   IpcHandler {
-    target: "whatsapp-claude"
+    target: "omawhats"
     function toggle(): void { root.toggleWindow() }
     function show(): void { root.showWindow() }
     function hide(): void { root.hideWindow() }

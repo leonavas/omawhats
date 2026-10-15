@@ -21,15 +21,15 @@ Item {
 
   readonly property string repo: "https://github.com/leonavas/omawhats"
   readonly property string manifestUrl: "https://raw.githubusercontent.com/leonavas/omawhats/main/manifest.json"
-  // `WACLAUDE_UPDATE_DEV=1`, or "updateDev": true in settings.json, takes
+  // `OMAWHATS_UPDATE_DEV=1`, or "updateDev": true in settings.json, takes
   // whatever GitHub has as newer, to see the notice.
-  readonly property bool dev: Quickshell.env("WACLAUDE_UPDATE_DEV") === "1" || (!!u.app && u.app.setting("updateDev", false) === true)
+  readonly property bool dev: Quickshell.env("OMAWHATS_UPDATE_DEV") === "1" || (!!u.app && u.app.setting("updateDev", false) === true)
   // Background checks, on unless Settings turned them off.
   readonly property bool auto: !!u.app && u.app.setting("updateCheck", true) !== false
   // Where an update leaves its note (.json), output (.log) and exit code
   // (.rc) for whichever copy of us is running once it's done: the restart
   // replaces this one in the middle of it.
-  readonly property string base: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/whatsapp-claude-update"
+  readonly property string base: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/omawhats-update"
   readonly property string folderIn: { try { return u.app ? decodeURIComponent(u.app.pluginDir) : "" } catch (e) { return u.app.pluginDir } }
 
   // This copy's version: what the shell loaded, else the manifest on disk.
@@ -84,7 +84,7 @@ Item {
   function say(text) {
     var w = u.app.appWindow
     if (u.app.windowOpen && w && w.toast) w.toast(text)
-    else Quickshell.execDetached(["notify-send", "--app-name=WhatsApp", "--icon=" + u.app.appIcon, "WhatsApp", text])
+    else Quickshell.execDetached(["notify-send", "--app-name=Omawhats", "--icon=" + u.app.appIcon, "Omawhats", text])
   }
 
   // ---------------------------------------------------------------- where
@@ -142,7 +142,7 @@ Item {
       return
     }
     if (u.dev || u.newer(ver, u.version)) u.found(ver, manual)
-    else if (manual) u.say(u.app.tr("WhatsApp is up to date (" + u.version + ")", "O WhatsApp está atualizado (" + u.version + ")"))
+    else if (manual) u.say(u.app.tr("Omawhats is up to date (" + u.version + ")", "O Omawhats está atualizado (" + u.version + ")"))
   }
 
   // Kept while it updates, and once on disk unless this is newer still.
@@ -161,27 +161,30 @@ Item {
     if (u.phase !== "available") return
     if (u.how || !u.pluginId) { u.say(u.how || u.app.tr("Couldn't find where the plugin is installed", "Não foi possível achar onde o plugin está instalado")); return }
     u.phase = "updating"
-    u.say(u.app.tr("Updating WhatsApp to " + u.latest + " in the terminal… the shell then restarts and the window comes back",
-                   "Atualizando o WhatsApp para " + u.latest + " no terminal… depois o shell reinicia e a janela volta"))
+    u.say(u.app.tr("Updating Omawhats to " + u.latest + " in the terminal… the shell then restarts and the window comes back",
+                   "Atualizando o Omawhats para " + u.latest + " no terminal… depois o shell reinicia e a janela volta"))
     // In Omarchy's floating terminal, as the bar's system update runs: the
     // script goes beside the note, out of the folder the update rewrites.
     // The exit code is written once the restart is over, so the new copy
-    // is the one that reads it; when nothing changed (up to date, or it
-    // failed) there's no restart and this copy reads it.
+    // is the one that reads it; when nothing changed (up to date,
+    // cancelled, or it failed) there's no restart and this copy reads it.
     run.command = ["setsid", "-f", "-w", "sh", "-c",
       'b=$2; printf "%s\\n" "$3" >"$b.json"; rm -f "$b.rc" "$b.log"; printf "%s\\n" "$4" >"$b.sh"\n' +
       'command -v omarchy-launch-floating-terminal-with-presentation >/dev/null 2>&1 || PATH=$PATH:${OMARCHY_PATH:-/usr/share/omarchy}/bin\n' +
       'command -v omarchy-launch-floating-terminal-with-presentation >/dev/null 2>&1 || { echo "no omarchy-launch-floating-terminal-with-presentation" >"$b.log"; echo 127 >"$b.rc"; exit 0; }\n' +
       'exec omarchy-launch-floating-terminal-with-presentation "$(printf "bash %q %q %q %q %q %q" "$b.sh" "$1" "$b" "$5" "$6" "$7")"',
-      "whatsapp-claude-update", u.pluginId, u.base, u.note(u.latest), u.script, u.version, u.latest, u.folder]
+      "omawhats-update", u.pluginId, u.base, u.note(u.latest), u.script, u.version, u.latest, u.folder]
     run.running = true
     pickupTimer.restart()
   }
   function note(to) { return JSON.stringify({ from: u.version, to: to, open: !!u.app.windowOpen }) }
 
-  // What the terminal runs: what's new (the commits it brings), Omarchy's
-  // update, the shell's restart. $1 the plugin's id, $2 where the note
-  // goes, $3 and $4 the versions, $5 the plugin's folder.
+  // What the terminal runs: what's new (the commits it brings), a yes or
+  // no (gum's, styled by the launcher), Omarchy's update (--yes: this was
+  // its confirm), the shell's restart. A no, or Ctrl+C, leaves 130, the
+  // code the launcher closes the terminal on without its "Done!". $1 the
+  // plugin's id, $2 where the note goes, $3 and $4 the versions, $5 the
+  // plugin's folder.
   readonly property string script: [
     'id=$1 b=$2 from=$3 to=$4 dir=$5',
     'say() { printf "\\033[34m●\\033[0m %s\\n" "$*"; }',
@@ -190,6 +193,7 @@ Item {
     'new=$(git -C "$dir" fetch -q 2>/dev/null && git -C "$dir" log --reverse --format="    • %s" HEAD..FETCH_HEAD)',
     '[ -n "$new" ] && printf "\\n  What\'s new:\\n%s\\n" "$new"',
     'echo',
+    'if ! gum confirm "Update Omawhats to $to?"; then say "Update cancelled"; echo cancelled >"$b.log"; echo 130 >"$b.rc"; exit 130; fi',
     'say "omarchy plugin update $id"',
     'omarchy plugin update "$id" --yes >"$b.log" 2>&1; rc=$?',
     'if [ $rc -ne 0 ]; then printf "\\033[31m%s\\033[0m\\n" "$(tail -n 3 "$b.log")"',
@@ -213,7 +217,7 @@ Item {
       'printf "%s\\n" "$2" >"$1.json"; : >"$1.log"; rm -f "$1.rc"\n' +
       'command -v omarchy-restart-shell >/dev/null 2>&1 || PATH=$PATH:${OMARCHY_PATH:-/usr/share/omarchy}/bin\n' +
       'omarchy-restart-shell >>"$1.log" 2>&1; echo $? >"$1.rc"',
-      "whatsapp-claude-restart", u.base, u.note(u.latest)])
+      "omawhats-restart", u.base, u.note(u.latest)])
   }
 
   // ---------------------------------------------------------------- the outcome
@@ -254,7 +258,7 @@ Item {
     if (rc === 0 && log.some(function(l) { return / is up to date\.$/.test(l) })) {
       u.phase = ""
       u.latest = ""
-      msg = u.app.tr("WhatsApp is already the latest", "O WhatsApp já é a versão mais recente")
+      msg = u.app.tr("Omawhats is already the latest", "O Omawhats já é a versão mais recente")
     } else if (rc === 0 && n.from && u.newer(u.version, n.from)) {
       u.phase = ""
       u.latest = ""
@@ -264,6 +268,10 @@ Item {
       u.latest = n.to || u.latest
       u.phase = "updated"
       msg = u.app.tr("Updated to " + u.latest + " · restart the shell to use it", "Atualizado para " + u.latest + " · reinicie o shell para usar")
+    } else if (rc === 130) {
+      // Turned down in the terminal: still there to update.
+      u.phase = u.latest ? "available" : ""
+      msg = u.app.tr("Update cancelled", "Atualização cancelada")
     } else {
       u.phase = u.latest ? "available" : ""
       var why = log.length ? log[log.length - 1].replace(/^omarchy-plugin-update:\s*/, "") : "exit " + rc

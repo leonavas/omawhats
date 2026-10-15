@@ -1,4 +1,4 @@
-bridge/whatsapp-claude-bridge*
+bridge/omawhats-bridge*
 *.log
 *.db
 *.db-*

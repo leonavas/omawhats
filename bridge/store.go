@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -111,6 +112,18 @@ func migrate(db *sql.DB) {
 		`messages ADD COLUMN starred INTEGER NOT NULL DEFAULT 0`,
 	} {
 		db.Exec(`ALTER TABLE ` + col)
+	}
+	// Omawhats was whatsapp-claude, and its cache folder moved with the
+	// name: the pictures of link previews and quotes stored before point
+	// into the old one. Once per database.
+	var renamed string
+	db.QueryRow(`SELECT v FROM meta WHERE k = 'renamed'`).Scan(&renamed)
+	if renamed == "" {
+		old := filepath.Join(filepath.Dir(cacheRoot), "whatsapp-claude", "media") + "/"
+		if _, err := db.Exec(`UPDATE messages SET x = replace(x, ?1, ?2), quote_thumb = replace(quote_thumb, ?1, ?2)
+			WHERE instr(x, ?1) > 0 OR instr(quote_thumb, ?1) > 0`, old, mediaDir()+"/"); err == nil {
+			db.Exec(`INSERT INTO meta (k, v) VALUES ('renamed', '1') ON CONFLICT (k) DO NOTHING`)
+		}
 	}
 }
 

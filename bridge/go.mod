@@ -1,4 +1,4 @@
-module whatsapp-claude/bridge
+module omawhats/bridge
 
 go 1.27.2
 

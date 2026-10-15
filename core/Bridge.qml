@@ -46,7 +46,7 @@ Item {
   function _line(text) {
     if (!text) return
     var ev
-    try { ev = JSON.parse(text) } catch (e) { console.warn("whatsapp-claude: bad bridge line", text.slice(0, 200)); return }
+    try { ev = JSON.parse(text) } catch (e) { console.warn("omawhats: bad bridge line", text.slice(0, 200)); return }
     if (ev.t === "build") {
       if (ev.state === "start") root.build = "building"
       else if (ev.state === "done") root.build = ""

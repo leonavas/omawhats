@@ -87,7 +87,7 @@ Rectangle {
                           "Na primeira vez, o bridge do WhatsApp é compilado neste computador (o Go vem pelo mise, que já faz parte do Omarchy). Leva um ou dois minutos e só acontece de novo depois de uma atualização.")
               : lv.wa.bridge.buildError === "no_go"
                 ? lv.app.tr("Neither mise nor Go were found. Install one of them and try again.", "Não encontrei o mise nem o Go. Instale um deles e tente de novo.")
-                : lv.app.tr("The build failed. The log is in ", "A compilação falhou. O log está em ") + "~/.local/share/whatsapp-claude/bridge.log"
+                : lv.app.tr("The build failed. The log is in ", "A compilação falhou. O log está em ") + "~/.local/share/omawhats/bridge.log"
             color: lv.t.dim
             font.family: lv.t.font
             font.pixelSize: lv.t.fsName - 1

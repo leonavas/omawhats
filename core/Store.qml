@@ -644,7 +644,7 @@ Item {
       if (ev.code === "set_photo") wa.photoBusy = false
       if (ev.code === "pair_phone" || ev.code === "pair_phone_number") wa.pairError = L.error(ev.code, wa.app.lang)
       wa.failed(L.error(ev.code, wa.app.lang) + (ev.text && ev.code !== "pair_phone_number" ? "" : ""))
-      if (ev.text) console.warn("whatsapp-claude:", ev.code, ev.text)
+      if (ev.text) console.warn("omawhats:", ev.code, ev.text)
       break
     }
   }
