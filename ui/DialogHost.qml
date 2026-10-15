@@ -4,12 +4,14 @@ import Quickshell
 import "../lib/Util.js" as U
 import "../lib/Labels.js" as L
 import "../lib/Format.js" as F
+import "../lib/Emoji.js" as Emoji
 import "../lib/Registry.js" as Reg
 
 // The dialogs, over a dimmed window, as WhatsApp Web's: confirmations
 // (log out, clear or delete a chat, delete messages), forwarding, the
-// preview of files before they're sent, who reacted, the emoji picker for
-// a reaction, the keyboard shortcuts, and from your menu (AccountMenu.qml)
+// preview of files before they're sent, editing a message, who reacted,
+// the emoji picker for a reaction, the keyboard shortcuts, and from your
+// menu (AccountMenu.qml)
 // your profile and About, as whatsapp-tui's.
 Item {
   id: host
@@ -53,6 +55,7 @@ Item {
       case "deleteMsgs": return deleteC
       case "forward": return forwardC
       case "sendFiles": return filesC
+      case "editMsg": return editC
       case "reactions": return reactionsC
       case "emoji": return emojiC
       case "shortcuts": return shortcutsC
@@ -411,6 +414,166 @@ Item {
             Icon { anchors.centerIn: parent; name: "send"; size: host.t.sp(24); color: host.t.onBrand }
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: sf.send() }
           }
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ edit a message
+  // WhatsApp Web's "Edit message": the bubble as the chat draws it, over
+  // the chat's background, following what you type; under it the text, the
+  // cursor at its end, the emoji and ✓. Enter saves as the message box
+  // sends (Shift+Enter breaks a line); unchanged or empty, it just closes.
+  Component {
+    id: editC
+    DFrame {
+      id: ef
+      readonly property var m: host.args.msg
+      // The message with what's typed, the original while the field is empty.
+      readonly property var live: {
+        var o = {}
+        for (var k in ef.m) o[k] = ef.m[k]
+        if (field.text.trim()) o.text = field.text
+        return o
+      }
+      readonly property var row: {
+        var j = ef.live.kind === "text" && !ef.live.quote && !ef.live.fwd ? Emoji.count(ef.live.text) : 0
+        return { first: false, group: false, jumbo: j > 3 ? 0 : j }
+      }
+      cardWidth: host.t.sp(560)
+      function save() {
+        var text = field.text.trim()
+        if (text && text !== String(ef.m.text || "").trim()) host.wa.edit(ef.m, host.args.withMentions ? host.args.withMentions(text) : text)
+        host.hide()
+      }
+      Column {
+        width: parent.width
+        spacing: host.t.sp(16)
+        Row {
+          x: -host.t.sp(10)
+          spacing: host.t.sp(8)
+          IconButton { icon: "close"; tip: host.app.tr("Close", "Fechar"); anchors.verticalCenter: parent.verticalCenter; onClicked: host.hide() }
+          Text {
+            textFormat: Text.PlainText
+            anchors.verticalCenter: parent.verticalCenter
+            text: host.app.tr("Edit message", "Editar mensagem")
+            color: host.t.textBright
+            font.family: host.t.font
+            font.pixelSize: host.t.px(19)
+            font.weight: Font.Medium
+          }
+        }
+        // The bubble in the middle; a tall one shows its end, where the
+        // text is.
+        Clip {
+          width: parent.width
+          height: Math.min(Math.max(host.t.sp(180), bubble.height + host.t.sp(48)), picker.visible ? host.t.sp(160) : host.height * 0.4)
+          radius: host.t.sp(10)
+          color: host.t.chatBg
+          Image {
+            anchors.fill: parent
+            visible: host.app.doodleOn
+            source: Qt.resolvedUrl(host.t.dark ? "../assets/doodle-white.png" : "../assets/doodle-black.png")
+            fillMode: Image.Tile
+            sourceSize.width: 374
+            sourceSize.height: 666
+            horizontalAlignment: Image.AlignLeft
+            verticalAlignment: Image.AlignTop
+            opacity: host.t.doodleAlpha * (host.t.dark ? 1 : 1.2)
+            smooth: true
+            cache: true
+            asynchronous: true
+          }
+          Bubble {
+            id: bubble
+            app: host.app
+            win: host.win
+            m: ef.live
+            row: ef.row
+            maxWidth: Math.min(parent.width - host.t.sp(48), host.t.sp(420))
+            x: Math.round((parent.width - width) / 2)
+            y: Math.round(Math.min((parent.height - height) / 2, parent.height - height - host.t.sp(24)))
+          }
+          // Only to look at: no menu, no links.
+          MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; hoverEnabled: true }
+        }
+        Item {
+          width: parent.width
+          height: Math.max(host.t.sp(60), fieldScroll.height + host.t.sp(28))
+          Flickable {
+            id: fieldScroll
+            anchors.left: parent.left
+            anchors.right: emojiBtn.left
+            anchors.rightMargin: host.t.sp(8)
+            anchors.verticalCenter: parent.verticalCenter
+            height: Math.min(contentHeight, host.t.sp(140))
+            contentHeight: field.implicitHeight
+            contentWidth: width
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            interactive: contentHeight > height
+            function ensureVisible(r) {
+              if (contentY >= r.y) contentY = r.y
+              else if (contentY + height <= r.y + r.height) contentY = r.y + r.height - height
+            }
+            ScrollBar.vertical: ThinScroll { app: host.app }
+            TextEdit {
+              id: field
+              width: fieldScroll.width
+              wrapMode: TextEdit.Wrap
+              textFormat: TextEdit.PlainText
+              color: host.t.text
+              font.family: host.t.font
+              font.pixelSize: host.t.fsMsg + 1
+              selectByMouse: true
+              persistentSelection: true
+              selectionColor: host.t.alpha(host.t.accent, 0.4)
+              selectedTextColor: host.t.textBright
+              onCursorRectangleChanged: fieldScroll.ensureVisible(cursorRectangle)
+              Component.onCompleted: { field.text = ef.m.text || ""; field.cursorPosition = field.length; forceActiveFocus() }
+              Keys.onPressed: event => {
+                var ctrl = event.modifiers & Qt.ControlModifier, shift = event.modifiers & Qt.ShiftModifier
+                if (event.key === Qt.Key_Escape && picker.visible) { picker.visible = false; event.accepted = true; return }
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                  if (host.app.enterSends ? !shift : ctrl) { ef.save(); event.accepted = true }
+                  else if (!shift) { field.insert(field.cursorPosition, "\n"); event.accepted = true }
+                }
+              }
+            }
+          }
+          IconButton {
+            id: emojiBtn
+            anchors.right: okBtn.left
+            anchors.rightMargin: host.t.sp(8)
+            anchors.verticalCenter: okBtn.verticalCenter
+            icon: picker.visible ? "keyboard" : "smiley"
+            tip: host.app.tr("Emoji", "Emojis")
+            active: picker.visible
+            onClicked: { picker.visible = !picker.visible; field.forceActiveFocus() }
+          }
+          Rectangle {
+            id: okBtn
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: host.t.sp(8)
+            width: host.t.sp(48); height: width; radius: width / 2
+            color: host.t.accent
+            Icon { anchors.centerIn: parent; name: "check"; size: host.t.sp(26); color: host.t.onBrand }
+            MouseArea { id: okMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: ef.save() }
+            Tip { text: host.app.tr("Save", "Salvar"); shown: okMa.containsMouse; placement: "above" }
+          }
+          Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 2; color: host.t.accent }
+        }
+        // The message box's emoji panel, its picker only.
+        EmojiPanel {
+          id: picker
+          visible: false
+          width: parent.width
+          height: host.t.sp(300)
+          radius: host.t.sp(10)
+          app: host.app
+          pickOnly: true
+          onPicked: glyph => { var at = field.cursorPosition; field.insert(at, glyph); field.cursorPosition = at + glyph.length; field.forceActiveFocus() }
         }
       }
     }

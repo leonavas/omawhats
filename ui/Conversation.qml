@@ -70,14 +70,18 @@ Item {
     return n === "" || n.indexOf("~") === 0 ? U.phone(String(m.sender).split("@")[0]) : n
   }
 
-  // The message you're answering, or editing.
+  // The message you're answering.
   property var replyTo: null
-  property var editing: null
-  onChatChanged: { conv.replyTo = null; conv.editing = null; conv.endSelect() }
+  onChatChanged: { conv.replyTo = null; conv.endSelect() }
 
   function focusComposer() { composer.focusInput() }
-  function reply(m) { conv.editing = null; conv.replyTo = m; composer.focusInput() }
-  function startEdit(m) { conv.replyTo = null; conv.editing = m; composer.startEdit(m) }
+  function reply(m) { conv.replyTo = m; composer.focusInput() }
+  // Editing one of yours, in its dialog, as WhatsApp Web's: the box keeps
+  // what you'd begun to type there, and the message you're answering. The
+  // "@Name"s picked in the box still stand for their numbers.
+  function startEdit(m) { conv.win.dialog("editMsg", { msg: m, withMentions: composer.withMentions, onClose: conv.backToBox }) }
+  // Saved or not, back to the box, and all the way down.
+  function backToBox() { composer.focusInput(); list.toBottom(true) }
 
   Component.onCompleted: { if (conv.group || !conv.info) conv.wa.askProfile(conv.chat) }
 

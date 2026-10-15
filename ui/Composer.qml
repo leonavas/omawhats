@@ -10,8 +10,9 @@ import "../lib/Registry.js" as Reg
 // The message box, as WhatsApp Web's: the + (documents, photos and videos,
 // audio), the emoji and sticker panel, the text (growing to a few lines,
 // with your draft kept per chat), and the microphone, or send once there's
-// text. Over it: the message you're answering, or editing. Recording a
-// voice note turns it into the recorder.
+// text. Over it: the message you're answering. Recording a voice note
+// turns it into the recorder. Editing one of yours has its own dialog
+// (DialogHost.qml), the box and its draft left as they are.
 Item {
   id: box
   property var app: Reg.service
@@ -24,16 +25,10 @@ Item {
   readonly property bool group: chat.indexOf("@g.us") > 0
   readonly property bool hasText: input.text.trim().length > 0
   readonly property var replyTo: view ? view.replyTo : null
-  readonly property var editing: view ? view.editing : null
 
   height: pill.height + top.height + t.sp(10) + t.sp(8) + (panel.visible ? panel.height : 0) + (mentions.visible ? mentions.height : 0)
 
   function focusInput() { input.forceActiveFocus() }
-  function startEdit(m) {
-    input.text = m.text || ""
-    input.cursorPosition = input.length
-    input.forceActiveFocus()
-  }
   function insert(s) {
     var at = input.cursorPosition
     input.insert(at, s)
@@ -61,7 +56,7 @@ Item {
   property real _lastTyping: 0
   Timer { id: pausedSoon; interval: 4000; onTriggered: box.wa.typingState(box.chat, "paused") }
   function typed() {
-    if (box._loading || box.editing) return
+    if (box._loading) return
     draftSave.chat = box.chat
     draftSave.text = input.text
     draftSave.restart()
@@ -152,13 +147,8 @@ Item {
   function send() {
     var text = input.text.trim()
     if (!text) return
-    if (box.editing) {
-      box.wa.edit(box.editing, box.withMentions(text))
-      box.view.editing = null
-    } else {
-      box.wa.sendText(box.chat, box.withMentions(text), box.replyTo ? box.replyTo.id : "")
-      box.view.replyTo = null
-    }
+    box.wa.sendText(box.chat, box.withMentions(text), box.replyTo ? box.replyTo.id : "")
+    box.view.replyTo = null
     box.clear()
     input.forceActiveFocus()
   }
@@ -177,7 +167,7 @@ Item {
   // The preview of files to send, as WhatsApp Web's: what you'd begun to
   // type goes along as their caption, and leaves the box once they're sent.
   function preview(args) {
-    var text = box.editing ? "" : input.text
+    var text = input.text
     args.chat = box.chat
     args.reply = box.replyTo ? box.replyTo.id : ""
     args.caption = text
@@ -318,14 +308,13 @@ Item {
     y: (panel.visible ? panel.height : 0) + (mentions.visible ? mentions.height : 0) + box.t.sp(6)
     width: parent.width - box.t.sp(32)
     spacing: box.t.sp(4)
-    // The message being answered, or edited.
+    // The message being answered.
     Item {
-      visible: !!box.replyTo || !!box.editing
+      visible: !!box.replyTo
       width: parent.width
-      height: visible ? Math.max(quoteBox.height, editBox.height) + box.t.sp(4) : 0
+      height: visible ? quoteBox.height + box.t.sp(4) : 0
       Quote {
         id: quoteBox
-        visible: !!box.replyTo
         app: box.app
         composer: true
         width: parent.width - box.t.sp(48)
@@ -333,30 +322,11 @@ Item {
                                text: box.replyTo.text || L.short(box.replyTo, box.app.lang).text, thumb: box.replyTo.media ? box.replyTo.media.thumb || "" : "" } : null
         onClicked: {}
       }
-      Rectangle {
-        id: editBox
-        visible: !!box.editing
-        width: parent.width - box.t.sp(48)
-        height: visible ? box.t.sp(46) : 0
-        radius: box.t.sp(7)
-        color: box.t.alpha(box.t.fg, 0.07)
-        Rectangle { width: box.t.sp(4); height: parent.height; radius: 2; color: box.t.accent }
-        Row {
-          x: box.t.sp(14)
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: box.t.sp(8)
-          Icon { name: "edit"; size: box.t.sp(18); color: box.t.accent; anchors.verticalCenter: parent.verticalCenter }
-          Text { textFormat: Text.PlainText; text: box.app.tr("Editing message", "Editando mensagem"); color: box.t.accent; font.family: box.t.font; font.pixelSize: box.t.fsText; anchors.verticalCenter: parent.verticalCenter }
-        }
-      }
       IconButton {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         icon: "close"
-        onClicked: {
-          if (box.editing) { box.view.editing = null; box.loadDraft() }
-          box.view.replyTo = null
-        }
+        onClicked: box.view.replyTo = null
       }
     }
   }
@@ -465,11 +435,10 @@ Item {
           if (event.key === Qt.Key_Escape) {
             if (box.mentionAt >= 0) { box.mentionAt = -1; event.accepted = true; return }
             if (panel.visible) { panel.visible = false; event.accepted = true; return }
-            if (box.editing) { box.view.editing = null; box.loadDraft(); event.accepted = true; return }
             if (box.replyTo) { box.view.replyTo = null; event.accepted = true; return }
             return
           }
-          if (event.key === Qt.Key_Up && input.length === 0 && !box.editing) { if (box.editLast()) event.accepted = true; return }
+          if (event.key === Qt.Key_Up && input.length === 0) { if (box.editLast()) event.accepted = true; return }
           // Shift+Insert too: the box's own paste would take text only.
           if ((ctrl && event.key === Qt.Key_V) || event.matches(StandardKey.Paste)) { box.paste(); event.accepted = true; return }
           if (ctrl && !shift && event.key === Qt.Key_B) { box.wrap("*"); event.accepted = true; return }
@@ -540,7 +509,7 @@ Item {
       }
       Icon {
         anchors.centerIn: parent
-        name: sendBtn.sendMode ? (box.editing ? "check" : "send") : "micFilled"
+        name: sendBtn.sendMode ? "send" : "micFilled"
         size: box.t.sp(22)
         color: sendBtn.sendMode ? box.t.onBrand : box.t.icon
       }
