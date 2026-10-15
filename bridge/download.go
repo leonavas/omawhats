@@ -362,7 +362,7 @@ func (b *Bridge) download(chat, id string, auto bool) {
 	var blob []byte
 	var fromMe bool
 	var ts int64
-	err := b.db.QueryRow(`SELECT COALESCE(mime, ''), COALESCE(kind, ''), proto, COALESCE(media.wa_chat, ''), COALESCE(media.wa_sender, ''), sender, from_me, ts
+	err := b.db.QueryRow(`SELECT COALESCE(mime, ''), COALESCE(media.kind, ''), proto, COALESCE(media.wa_chat, ''), COALESCE(media.wa_sender, ''), sender, from_me, ts
 		FROM messages LEFT JOIN media USING (chat, id) WHERE chat = ? AND id = ?`, chat, id).
 		Scan(&mimeType, &kind, &blob, &waChat, &waSender, &sender, &fromMe, &ts)
 	if err != nil {
