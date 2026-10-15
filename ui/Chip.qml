@@ -9,6 +9,8 @@ Rectangle {
   property string label: ""
   property int count: 0
   property bool on: false
+  // The label an emoji (a reaction's), at a size it reads.
+  property bool emoji: false
   signal clicked()
   height: t.sp(32)
   width: row.implicitWidth + t.sp(24)
@@ -24,8 +26,8 @@ Rectangle {
       textFormat: Text.PlainText
       text: c.label
       color: c.on ? c.t.chipOnText : c.t.dim
-      font.family: c.t.font
-      font.pixelSize: c.t.fsChip
+      font.family: c.emoji ? c.t.emojiFont : c.t.font
+      font.pixelSize: c.emoji ? c.t.sp(18) : c.t.fsChip
       font.weight: Font.Medium
     }
     Text {

@@ -11,6 +11,8 @@ Item {
   property string name: ""
   property string sub: ""
   property string badge: ""
+  // The badge an emoji at its own size (who reacted with what), not a tag.
+  property bool badgeEmoji: false
   property bool group: false
   property bool checked: false
   property bool checkable: false
@@ -83,11 +85,11 @@ Item {
       visible: pr.badge !== ""
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      height: pr.t.sp(22)
-      width: badgeText.implicitWidth + pr.t.sp(14)
+      height: pr.badgeEmoji ? badgeText.implicitHeight : pr.t.sp(22)
+      width: badgeText.implicitWidth + (pr.badgeEmoji ? 0 : pr.t.sp(14))
       radius: pr.t.sp(6)
-      color: pr.t.chipOn
-      Text { id: badgeText; textFormat: Text.PlainText; anchors.centerIn: parent; text: pr.badge; color: pr.t.chipOnText; font.family: pr.t.font; font.pixelSize: pr.t.fsSmall }
+      color: pr.badgeEmoji ? "transparent" : pr.t.chipOn
+      Text { id: badgeText; textFormat: Text.PlainText; anchors.centerIn: parent; text: pr.badge; color: pr.t.chipOnText; font.family: pr.badgeEmoji ? pr.t.emojiFont : pr.t.font; font.pixelSize: pr.badgeEmoji ? pr.t.sp(26) : pr.t.fsSmall }
     }
     Icon {
       id: check

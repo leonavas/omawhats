@@ -30,7 +30,18 @@ Item {
   // elsewhere in the card does; Esc in the field drops it.
   signal commitEdits()
   // The focus before the dialog: one with a field (the caption) takes it.
-  function show(n, a) { host.args = a || {}; host.forceActiveFocus(); host.name = n }
+  function show(n, a) {
+    host.args = a || {}
+    var an = host.args.anchor
+    host.at = an ? an.mapToItem(host, 0, 0, an.width, an.height) : null
+    host.forceActiveFocus()
+    host.name = n
+  }
+  // Opened from something on screen (a message's reactions): the card drops
+  // down from it, as WhatsApp Web's, over the chat left as it is; else in the
+  // middle, the window dimmed.
+  property var at: null
+  readonly property bool anchored: !!at
   function hide() {
     var after = host.args.onClose
     host.commitEdits(); host.name = ""; host.args = ({})
@@ -41,13 +52,20 @@ Item {
 
   Rectangle {
     anchors.fill: parent
-    color: host.t.scrim
+    color: host.anchored ? "transparent" : host.t.scrim
     MouseArea { anchors.fill: parent; onClicked: host.hide() }
   }
 
   Loader {
     id: body
-    anchors.centerIn: parent
+    anchors.centerIn: host.anchored ? undefined : parent
+    // Under it (above, when there's no room), lined up with its right edge
+    // on the right half of the window, its left edge on the left half.
+    readonly property real gap: host.t.sp(6)
+    x: !host.anchored ? 0 : Math.max(host.t.sp(12), Math.min(host.width - width - host.t.sp(12),
+         host.at.x + host.at.width / 2 > host.width / 2 ? host.at.x + host.at.width - width : host.at.x))
+    y: !host.anchored ? 0 : (host.at.y + host.at.height + gap + height <= host.height - host.t.sp(12)
+         ? host.at.y + host.at.height + gap : Math.max(host.t.sp(12), host.at.y - gap - height))
     active: host.shown
     sourceComponent: {
       switch (host.name) {
@@ -587,8 +605,9 @@ Item {
       readonly property var m: host.args.msg
       readonly property var latest: { var x = host.wa.findMsg(m.chat, m.id); return x || m }
       property string only: ""
-      title: host.app.tr("Reactions", "Reações")
-      cardWidth: host.t.sp(400)
+      readonly property int total: (rf.latest.reactions || []).reduce(function(s, r) { return s + r.count }, 0)
+      title: rf.total === 1 ? host.app.tr("1 reaction", "1 reação") : host.app.tr(rf.total + " reactions", rf.total + " reações")
+      cardWidth: host.t.sp(440)
       readonly property var people: {
         var out = []
         ;(rf.latest.reactions || []).forEach(function(r) {
@@ -600,14 +619,30 @@ Item {
       Column {
         width: parent.width
         spacing: host.t.sp(8)
+        // Yours to add, then each emoji with its count: a click shows only
+        // who sent it, another shows everyone again.
         Row {
           spacing: host.t.sp(6)
-          Chip { app: host.app; label: host.app.tr("All", "Todas"); count: (rf.latest.reactions || []).reduce(function(s, r) { return s + r.count }, 0); on: rf.only === ""; onClicked: rf.only = "" }
+          Rectangle {
+            width: host.t.sp(42); height: host.t.sp(36); radius: height / 2
+            color: addMa.containsMouse ? host.t.hoverStrong : "transparent"
+            border.width: 1
+            border.color: host.t.lineStrong
+            Icon { anchors.centerIn: parent; name: "react"; size: host.t.sp(22); color: host.t.icon }
+            MouseArea {
+              id: addMa
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: { var m = rf.m; host.win.dialog("emoji", { onPick: function(e) { host.wa.react(m, e) } }) }
+            }
+          }
           Repeater {
             model: rf.latest.reactions || []
-            delegate: Chip { required property var modelData; app: host.app; label: modelData.emoji; count: modelData.count; on: rf.only === modelData.emoji; onClicked: rf.only = modelData.emoji }
+            delegate: Chip { required property var modelData; app: host.app; emoji: true; height: host.t.sp(36); label: modelData.emoji; count: modelData.count; on: rf.only === modelData.emoji; onClicked: rf.only = rf.only === modelData.emoji ? "" : modelData.emoji }
           }
         }
+        Rectangle { width: parent.width + host.t.sp(48); x: -host.t.sp(24); height: 1; color: host.t.line }
         ListView {
           width: parent.width + host.t.sp(24)
           x: -host.t.sp(12)
@@ -621,6 +656,7 @@ Item {
             name: modelData.name === "" ? host.app.tr("You", "Você") : String(modelData.name).replace(/^~/, "")
             sub: modelData.name === "" ? host.app.tr("Click to remove", "Clique para remover") : ""
             badge: modelData.emoji
+            badgeEmoji: true
             onClicked: { if (modelData.name === "") host.wa.react(rf.m, ""); else host.win.showProfile(modelData.jid); host.hide() }
           }
         }

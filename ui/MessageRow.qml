@@ -220,7 +220,7 @@ Item {
             leftPadding: r.t.sp(2)
           }
         }
-        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: r.win.dialog("reactions", { msg: mi.m }) }
+        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: r.win.dialog("reactions", { msg: mi.m, anchor: parent }) }
       }
 
       // The quick react button beside the bubble, on hover.
