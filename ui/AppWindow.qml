@@ -28,7 +28,9 @@ FloatingWindow {
   property bool accountOpen: false
   readonly property bool menusShown: menus.shown
 
-  title: (app.attention.chats > 0 ? "(" + app.attention.chats + ") " : "") + app.windowTitleBase
+  // While a launch maps it, the one-time title its window rule looks for
+  // (Service.launchWindow).
+  title: app.launchTitle || (app.attention.chats > 0 ? "(" + app.attention.chats + ") " : "") + app.windowTitleBase
   visible: app.windowOpen
   implicitWidth: Math.round(app.setting("windowWidth", 1280))
   implicitHeight: Math.round(app.setting("windowHeight", 820))

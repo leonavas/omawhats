@@ -135,7 +135,7 @@ Item {
   onRunningChanged: if (running) root.startedAt = Date.now() / 1000
   function start() { root.running = true }
   function quit() {
-    root.windowOpen = false
+    root.hideWindow()
     root.running = false
   }
 
@@ -149,7 +149,7 @@ Item {
   // parks it in a Hyprland special workspace (Omarchy's scratchpad,
   // SUPER+S), where it stays as it was, or leaves it be; a window opened
   // with "Open in Scratchpad" goes straight there, and one opened in the
-  // background (Launch in Foreground off) is parked at once. Closing it
+  // background (Launch in Foreground off) is born there, unseen. Closing it
   // (hideWindow) unmaps it; the app keeps counting and notifying either way.
   property var barOptions: ({ specialName: "scratchpad", openInSpecial: true, hideMode: "Special workspace", launchForeground: true })
   property bool autoStarted: false
@@ -166,8 +166,9 @@ Item {
     var s = ipc ? ipc["specialWorkspace"] : null
     return !!s && String(s.name || "") === "special:" + root.specialName
   }
-  // On while a background launch puts the window away: Hyprland focuses it
-  // for a moment on the way, which must not count as reading it.
+  // On while a background launch puts the window away: when the launch rule
+  // missed, Hyprland focuses it for a moment on the way, which must not
+  // count as reading it.
   property bool stowing: false
 
   function showWindow() {
@@ -178,7 +179,7 @@ Item {
     }
     root.raiseSoon()
   }
-  function hideWindow() { root.windowOpen = false }
+  function hideWindow() { root._launchPending = false; root.endLaunch(); root.windowOpen = false }
   // Left click: open it, bring it back, put it away.
   function toggleWindow() {
     if (!root.windowOpen) root.launchWindow(root.barOptions.launchForeground !== false)
@@ -187,19 +188,84 @@ Item {
     else root.raiseSoon()
   }
 
-  // A Quickshell window can't be born in a hidden workspace: it maps on the
-  // current one, and once Hyprland lists it, it moves on.
+  // A Quickshell window maps where Hyprland's window rules send it, so one
+  // headed for the scratchpad (a background launch, or "Open in
+  // Scratchpad") is born there. For the launch it carries a one-time title
+  // (`launchTitle`, shown by AppWindow instead of its own), and a named
+  // rule for exactly that title and our app id, set before it maps, sends
+  // it to the special workspace: silently and without the focus in the
+  // background (nothing shows on the current workspace, the focus and the
+  // cursor stay where they were), opening the scratchpad with it in the
+  // foreground. Once Hyprland reports it (openwindow) the title goes back
+  // and the rule is switched off. Hyprlang configs get the same rules with
+  // `keyword`, which can't be taken back but name a title no window will
+  // have again; a window a rule missed still maps on the current workspace
+  // and is moved once Hyprland lists it, as before.
   property bool _launchForeground: true
   property string _launchBack: ""
+  property bool _launchPending: false
+  property string _launchWorkspace: ""
+  property string launchTitle: ""
+  readonly property string launchRule: "omawhats-launch"
   function launchWindow(foreground) {
     root.running = true
+    if (root._launchPending) return
     root._launchForeground = foreground
     root._launchBack = root.lastOtherAddress
+    root._launchWorkspace = ""
     root.stowing = !foreground
+    if (foreground && root.barOptions.openInSpecial === false) { root.mapLaunch(); return }
+    root.launchTitle = "omawhats-launch-" + Math.random().toString(36).slice(2, 10)
+    root._launchPending = true
+    launchRuleProc.command = Hyprland.usingLua === true
+      ? ["hyprctl", "eval", root.launchRuleLua(true)]
+      : ["hyprctl", "--batch", root.launchRuleLegacy()]
+    launchRuleProc.running = true
+    launchRuleWait.restart()
+  }
+  // The window maps once the rule is in (or Hyprland took too long to say).
+  function mapLaunch() {
+    root._launchPending = false
+    launchRuleWait.stop()
     root.windowOpen = true
     placeTimer.ticks = 0
     placeTimer.restart()
   }
+  Process {
+    id: launchRuleProc
+    onExited: (code, status) => { if (root._launchPending) root.mapLaunch() }
+  }
+  Timer { id: launchRuleWait; interval: 1000; onTriggered: if (root._launchPending) root.mapLaunch() }
+
+  // One name per kind of launch: a named rule is declared again on each
+  // launch, and a foreground one must not keep a background one's effects.
+  function launchRuleLua(on) {
+    var spec = ["name = " + root.luaStr(root.launchRule + (root._launchForeground ? "-fg" : "-bg")), "enabled = " + on,
+                "match = { class = \"^org[.]quickshell$\", title = " + root.luaStr("^" + root.launchTitle + "$") + " }"]
+    var special = "special:" + root.specialName
+    if (on && root._launchForeground) spec.push("workspace = " + root.luaStr(special))
+    else if (on) spec.push("workspace = " + root.luaStr(special + " silent"), "no_initial_focus = true",
+                           "focus_on_activate = false", 'suppress_event = "activate activatefocus"')
+    return "hl.window_rule({ " + spec.join(", ") + " })"
+  }
+  // Both syntaxes, today's and the windowrulev2 one: the one Hyprland
+  // doesn't know is refused and changes nothing.
+  function launchRuleLegacy() {
+    var ws = "special:" + root.specialName + (root._launchForeground ? "" : " silent")
+    var cls = "^(org\\.quickshell)$", title = "^(" + root.launchTitle + ")$"
+    var rules = ["keyword windowrule workspace " + ws + (root._launchForeground ? "" : ", no_initial_focus on")
+                   + ", match:class " + cls + ", match:title " + title,
+                 "keyword windowrulev2 workspace " + ws + ", class:" + cls + ", title:" + title]
+    if (!root._launchForeground) rules.push("keyword windowrulev2 noinitialfocus, class:" + cls + ", title:" + title)
+    return rules.join(" ; ")
+  }
+  // The window is in: its own title back, the rule off.
+  function endLaunch() {
+    if (!root.launchTitle) return
+    if (Hyprland.usingLua === true) Quickshell.execDetached(["hyprctl", "eval", root.launchRuleLua(false)])
+    root.launchTitle = ""
+  }
+
   Timer {
     id: placeTimer
     property int ticks: 0
@@ -209,23 +275,25 @@ Item {
       var address = root.windowAddress()
       if (!address && ++ticks < 60 && root.windowOpen) return
       stop()
+      root.endLaunch()
       if (!address || !root.windowOpen) { root.stowing = false; return }
       var special = "special:" + root.specialName
+      var there = (root._launchWorkspace || root.workspaceOf(root.ourToplevel())) === special
       if (!root._launchForeground) {
-        root.moveWindow(address, special, true)
-        backgroundFix.restart()
+        if (there) stowEnd.restart()
+        else { root.moveWindow(address, special, true); backgroundFix.restart() }
       } else if (root.barOptions.openInSpecial !== false) {
         // Not silent: the scratchpad opens with it.
-        root.moveWindow(address, special, false)
+        if (!there) root.moveWindow(address, special, false)
         root.raiseSoon()
       } else root.raiseSoon()
     }
   }
 
-  // Moving the window that just took the focus makes Hyprland refocus, and
-  // its pick can be a window in the scratchpad, which opens it on screen.
-  // A background launch puts that back: scratchpad hidden, focus on the
-  // window you were using.
+  // Only when the launch rule missed. Moving the window that just took the
+  // focus makes Hyprland refocus, and its pick can be a window in the
+  // scratchpad, which opens it on screen. A background launch puts that
+  // back: scratchpad hidden, focus on the window you were using.
   Timer {
     id: backgroundFix
     interval: 200
@@ -295,7 +363,14 @@ Item {
       if (event.name === "activespecial" || event.name === "activespecialv2") Hyprland.refreshMonitors()
       if (event.name === "openwindow") {
         var f = event.parse(4)   // address, workspace, class, title
-        if (f.length >= 4 && root.isOurTitle(f[3])) root.tagWindow(f[0])
+        if (f.length >= 4 && root.isOurTitle(f[3])) {
+          root.tagWindow(f[0])
+          // Also where a launch ends: the window is in, wherever the rule put it.
+          if (root.launchTitle !== "" && f[3] === root.launchTitle) {
+            root._launchWorkspace = String(f[1])
+            root.endLaunch()
+          }
+        }
       }
     }
     function onActiveToplevelChanged() {
@@ -311,7 +386,7 @@ Item {
   readonly property string windowTitleBase: "Omawhats"
   function isOurTitle(title) {
     title = String(title || "")
-    return title === root.windowTitleBase || /^\(\d+\) Omawhats$/.test(title)
+    return (root.launchTitle !== "" && title === root.launchTitle) || title === root.windowTitleBase || /^\(\d+\) Omawhats$/.test(title)
   }
   function ourToplevel() {
     var list = Hyprland.toplevels ? (Hyprland.toplevels.values || []) : []
