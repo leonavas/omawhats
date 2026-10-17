@@ -81,8 +81,8 @@ Item {
         var at = root.indexOfKey("unread")
         if (at >= 0) { list.positionViewAtIndex(at, ListView.Contain); return }
       }
-      list.positionViewAtBeginning()
-      root.tryJump()
+      if (root._jump) { list.positionViewAtBeginning(); root.tryJump() }
+      else root.toBottom(true)
       return
     }
     var n = h.msgs.length
@@ -240,7 +240,7 @@ Item {
       color: root.t.badge
       Text { id: nb; textFormat: Text.PlainText; anchors.centerIn: parent; text: root.newBelow; color: root.t.badgeText; font.family: root.t.font; font.pixelSize: root.t.sp(11); font.weight: Font.DemiBold }
     }
-    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { list.positionViewAtBeginning(); root.newBelow = 0 } }
+    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { root.toBottom(true); root.newBelow = 0 } }
   }
 
   // Empty chat: WhatsApp's note, centered.
