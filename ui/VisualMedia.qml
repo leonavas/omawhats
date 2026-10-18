@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import "../lib/Util.js" as U
 import "../lib/Registry.js" as Reg
 
@@ -22,6 +23,10 @@ Item {
   readonly property bool gif: kind === "gif" || !!media.gif
   readonly property string state_: wa.downloadState(m)
   readonly property bool hasFile: !!media.file
+  // The thumbnail the message carries is tiny: blurred, as WhatsApp Web
+  // has it, rather than stretched into blocks. A downloaded video's frame
+  // (bridge's "frame") is sharp and stays so.
+  readonly property bool blurred: !!media.thumb && !/\.frame\.jpg$/.test(media.thumb)
 
   // WhatsApp's sizes: as wide as 330 points, the height by the picture's
   // shape, cropped past a point.
@@ -43,12 +48,22 @@ Item {
     color: vm.t.alpha(vm.t.fg, 0.06)
     Image {
       id: thumb
+      // Past the edges by the blur's reach, where it fades out: the clip
+      // cuts that off.
       anchors.fill: parent
+      anchors.margins: vm.blurred ? -vm.t.sp(40) : 0
       source: vm.media.thumb ? U.fileUrl(vm.media.thumb) : ""
       fillMode: Image.PreserveAspectCrop
       asynchronous: true
       smooth: true
       visible: full.status !== Image.Ready
+      layer.enabled: vm.blurred && GraphicsInfo.api !== GraphicsInfo.Software
+      layer.effect: MultiEffect {
+        blurEnabled: true
+        blur: 1.0
+        blurMax: 48
+        autoPaddingEnabled: false
+      }
     }
     Image {
       id: full
