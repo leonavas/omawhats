@@ -13,6 +13,11 @@ import "../lib/Registry.js" as Reg
 FloatingWindow {
   id: appWin
   property var app: Reg.service
+  // The views have their own copy of lib/Registry.js, not Service.qml's
+  // (the window comes through a LazyLoader): the app goes in it from here,
+  // before they read it.
+  readonly property bool _registered: { if (appWin.app) Reg.service = appWin.app; return true }
+  onAppChanged: if (appWin.app) Reg.service = appWin.app
   readonly property var t: app.theme
   readonly property var wa: app.wa
 
