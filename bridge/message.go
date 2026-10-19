@@ -134,7 +134,13 @@ func (b *Bridge) message(e *events.Message, status int) *Msg {
 		}
 		return nil
 	}
-	if pm := e.Message.GetProtocolMessage(); pm != nil {
+	pm := e.Message.GetProtocolMessage()
+	if sm := e.Message.GetSecretEncryptedMessage(); sm != nil {
+		if pm = b.sealedEdit(e, sm); pm == nil {
+			return nil
+		}
+	}
+	if pm != nil {
 		id := pm.GetKey().GetID()
 		switch pm.GetType() {
 		case waE2E.ProtocolMessage_REVOKE:
@@ -244,6 +250,31 @@ func (b *Bridge) message(e *events.Message, status int) *Msg {
 		out.fresh = m.fresh
 	}
 	return out
+}
+
+// sealedEdit opens an edit the phones now send sealed with the edited
+// message's own secret, into the edit as it used to come; nil for the
+// other sealed kinds (a poll's or an event's changes) and what won't open.
+func (b *Bridge) sealedEdit(e *events.Message, sm *waE2E.SecretEncryptedMessage) *waE2E.ProtocolMessage {
+	if sm.GetSecretEncType() != waE2E.SecretEncryptedMessage_MESSAGE_EDIT {
+		return nil
+	}
+	m, err := b.cli.DecryptSecretEncryptedMessage(b.ctx, e)
+	if err != nil {
+		logf("edit %s: %v", e.Info.ID, err)
+		return nil
+	}
+	if fp := m.GetEditedMessage().GetMessage(); fp != nil {
+		m = fp
+	}
+	pm := m.GetProtocolMessage()
+	if pm == nil {
+		pm = &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(), EditedMessage: m}
+	}
+	if pm.GetKey() == nil {
+		pm.Key = sm.GetTargetMessageKey()
+	}
+	return pm
 }
 
 // placeholder stands in for a message this device couldn't decrypt, as

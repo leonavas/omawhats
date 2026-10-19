@@ -132,7 +132,8 @@ func contentOf(m *waE2E.Message) (Content, bool) {
 	// Signals, not messages: nothing to show.
 	if m.GetReactionMessage() != nil || m.GetEncReactionMessage() != nil || m.GetProtocolMessage() != nil ||
 		m.GetPollUpdateMessage() != nil || m.GetSenderKeyDistributionMessage() != nil || m.GetKeepInChatMessage() != nil ||
-		m.GetAlbumMessage() != nil || m.GetEncEventResponseMessage() != nil || m.GetStickerSyncRmrMessage() != nil {
+		m.GetAlbumMessage() != nil || m.GetEncEventResponseMessage() != nil || m.GetStickerSyncRmrMessage() != nil ||
+		m.GetSecretEncryptedMessage() != nil {
 		return Content{}, false
 	}
 	// Nothing but its context (what a key exchange leaves): nothing either.
