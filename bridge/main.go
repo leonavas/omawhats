@@ -368,6 +368,8 @@ func (b *Bridge) commands() {
 			go b.search(c.Text, c.Chat)
 		case "media_list":
 			go b.mediaList(c.Chat, c.Kind)
+		case "msg_info":
+			go b.msgInfo(c.Chat, c.ID)
 		case "contacts":
 			go b.contactList()
 		case "starred":
@@ -569,7 +571,7 @@ func skip(chat types.JID) bool {
 // downloads. For a logout, from here or from the phone, and for a start
 // without a session, so a new one never shows the last one's chats.
 func (b *Bridge) wipe() {
-	for _, t := range []string{"chats", "messages", "media", "reactions", "fav_stickers", "meta"} {
+	for _, t := range []string{"chats", "messages", "media", "reactions", "receipts", "fav_stickers", "meta"} {
 		b.db.Exec("DELETE FROM " + t)
 	}
 	b.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")

@@ -95,6 +95,17 @@ CREATE TABLE IF NOT EXISTS reactions (
 	ts INTEGER NOT NULL,
 	PRIMARY KEY (chat, id, sender)
 );
+-- Who got, read and played your messages, and when (the first time of
+-- each, 0 until then): WhatsApp Web's "Message info".
+CREATE TABLE IF NOT EXISTS receipts (
+	chat TEXT NOT NULL,
+	id TEXT NOT NULL,
+	user TEXT NOT NULL,
+	delivered INTEGER NOT NULL DEFAULT 0,
+	read INTEGER NOT NULL DEFAULT 0,
+	played INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (chat, id, user)
+);
 -- Favorite stickers, as the app state has them: hash is the mutation's
 -- index (the file's SHA-256, base64), enc_hash the encrypted file's, action
 -- the StickerAction.

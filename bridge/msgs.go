@@ -1,11 +1,14 @@
 package main
 
-// A message's own menu: edit yours, delete for you or for everyone. As with
-// the chats, the change is made here first and sent to the app at once,
-// then to WhatsApp; if WhatsApp refuses it, it goes back.
+// A message's own menu: edit yours, delete for you or for everyone, see
+// who got and read it. As with the chats, a change is made here first and
+// sent to the app at once, then to WhatsApp; if WhatsApp refuses it, it
+// goes back.
 
 import (
+	"context"
 	"strings"
+	"time"
 
 	"go.mau.fi/whatsmeow/appstate"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -24,7 +27,7 @@ func (b *Bridge) removeMsgs(chat string, ids []string) {
 		args = append(args, id)
 	}
 	in := `chat = ? AND id IN (?` + strings.Repeat(", ?", len(ids)-1) + `)`
-	for _, t := range []string{"messages", "media", "reactions"} {
+	for _, t := range []string{"messages", "media", "reactions", "receipts"} {
 		b.db.Exec(`DELETE FROM `+t+` WHERE `+in, args...)
 	}
 	b.dirty.Store(true)
@@ -96,6 +99,7 @@ func (b *Bridge) revoke(chat string, ids []string) {
 		b.db.Exec(`UPDATE messages SET kind = 'revoked', text = '', x = '', edited = 0, card = '' WHERE chat = ? AND id = ?`, chat, id)
 		b.db.Exec(`DELETE FROM media WHERE chat = ? AND id = ?`, chat, id)
 		b.db.Exec(`DELETE FROM reactions WHERE chat = ? AND id = ?`, chat, id)
+		b.db.Exec(`DELETE FROM receipts WHERE chat = ? AND id = ?`, chat, id)
 		b.emitMsg(chat, id)
 	}
 	b.dirty.Store(true)
@@ -148,4 +152,58 @@ func (b *Bridge) deleteMsgs(chat string, ids []string, everyone bool) {
 	} else {
 		b.deleteForMe(chat, ids)
 	}
+}
+
+// msgInfo is what WhatsApp Web's "Message info" shows of one of yours: who
+// got it, read it and played it, and when, the latest first; in a group,
+// also how many others are in it, for the ones it hasn't reached yet.
+func (b *Bridge) msgInfo(chat, id string) {
+	type receipt struct {
+		JID       string `json:"jid"`
+		Name      string `json:"name"`
+		Delivered int64  `json:"delivered"`
+		Read      int64  `json:"read"`
+		Played    int64  `json:"played"`
+	}
+	out := map[string]any{"t": "msg_info", "chat": chat, "id": id}
+	list := []receipt{}
+	rows, err := b.db.Query(`SELECT user, delivered, read, played FROM receipts WHERE chat = ? AND id = ? ORDER BY played DESC, read DESC, delivered DESC`, chat, id)
+	if err == nil {
+		for rows.Next() {
+			var r receipt
+			if rows.Scan(&r.JID, &r.Delivered, &r.Read, &r.Played) == nil {
+				list = append(list, r)
+			}
+		}
+		rows.Close()
+	}
+	for i := range list {
+		list[i].Name = b.quoteName(list[i].JID)
+	}
+	out["receipts"] = list
+	if jid, err := types.ParseJID(chat); err == nil && jid.Server == types.GroupServer {
+		if n := b.othersIn(jid); n >= 0 {
+			out["others"] = n
+		}
+	}
+	emit(out)
+}
+
+// othersIn is how many are in a group besides you, as whatsmeow keeps its
+// members for sending: asked once, then kept up to date by the group's
+// notices; -1 when it can't be had.
+func (b *Bridge) othersIn(group types.JID) int {
+	ctx, cancel := context.WithTimeout(b.ctx, 20*time.Second)
+	defer cancel()
+	g, err := b.cli.DangerousInternals().GetCachedGroupData(ctx, group)
+	if err != nil || g == nil {
+		return -1
+	}
+	n := 0
+	for _, m := range g.Members {
+		if !b.mine(m) {
+			n++
+		}
+	}
+	return n
 }

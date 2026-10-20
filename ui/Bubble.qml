@@ -328,6 +328,7 @@ Item {
     var m = b.m
     var items = []
     if (b.canReact) items.push({ reactions: b.quick, mine: b.myReaction(), action: b.react, more: function() { b.win.dialog("emoji", { onPick: function(e) { b.react(e) } }) } })
+    if (m.from_me && b.canReact) items.push({ label: tr("Message info", "Dados da mensagem"), icon: "info", action: function() { b.win.msgInfo(m) } })
     var c = b.wa.chat(m.chat)
     var canSend = !(c && c.ro)
     if (canSend && b.canReact) items.push({ label: tr("Reply", "Responder"), icon: "reply", action: function() { b.view.reply(m) } })

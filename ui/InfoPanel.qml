@@ -5,12 +5,14 @@ import "../lib/Util.js" as U
 import "../lib/Format.js" as F
 import "../lib/Labels.js" as L
 import "../lib/Hours.js" as H
+import "../lib/Model.js" as Model
 import "../lib/Registry.js" as Reg
 
 // The right side panel, as WhatsApp Web's: the contact's or group's info
 // (photo, name, about, a business's details and hours, media, members,
-// groups in common, mute, starred, delete), the search in the chat, or its
-// media, links and docs. The open chat's, or of someone picked in it.
+// groups in common, mute, starred, delete), the search in the chat, its
+// media, links and docs, or who got and read one of your messages. The
+// open chat's, or of someone picked in it.
 Rectangle {
   id: ip
   property var app: Reg.service
@@ -49,6 +51,7 @@ Rectangle {
       anchors.verticalCenter: parent.verticalCenter
       text: ip.view === "search" ? ip.app.tr("Search messages", "Pesquisar mensagens")
           : ip.view === "media" ? ip.app.tr("Media, links and docs", "Mídia, links e docs")
+          : ip.view === "message" ? ip.app.tr("Message info", "Dados da mensagem")
           : ip.group ? ip.app.tr("Group info", "Dados do grupo") : ip.app.tr("Contact info", "Dados do contato")
       color: ip.t.textBright
       font.family: ip.t.font
@@ -61,7 +64,7 @@ Rectangle {
     y: head.height
     width: parent.width
     height: parent.height - y
-    sourceComponent: ip.view === "search" ? searchC : ip.view === "media" ? mediaC : infoC
+    sourceComponent: ip.view === "search" ? searchC : ip.view === "media" ? mediaC : ip.view === "message" ? messageC : infoC
   }
 
   // ------------------------------------------------------------ info
@@ -681,6 +684,177 @@ Rectangle {
         color: ip.t.dim
         font.family: ip.t.font
         font.pixelSize: ip.t.fsText
+      }
+    }
+  }
+  // ------------------------------------------------------------ a message's info
+  // A stage a message of yours reached in a group (played, read,
+  // delivered): who, with when, and how many it hasn't reached yet.
+  component Stage: Column {
+    id: st
+    property string icon: "ticks"
+    property color tint: ip.t.dim
+    property string label: ""
+    property var people: []
+    // Which of each one's times the line shows: delivered, read or played.
+    property string at: "read"
+    // How many it hasn't reached; -1 when the group's size isn't known.
+    property int remaining: -1
+    // Nobody in it and nobody left (delivered, once all have read it): not there.
+    property bool wanted: true
+    visible: st.wanted && (st.people.length > 0 || st.remaining !== 0)
+    width: parent ? parent.width : 0
+    Row {
+      leftPadding: ip.t.sp(30)
+      topPadding: ip.t.sp(18)
+      bottomPadding: ip.t.sp(6)
+      spacing: ip.t.sp(10)
+      Icon { name: st.icon; size: ip.t.sp(18); color: st.tint; anchors.verticalCenter: parent.verticalCenter }
+      Text { textFormat: Text.PlainText; text: st.label; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsText; anchors.verticalCenter: parent.verticalCenter }
+    }
+    Repeater {
+      model: st.people
+      delegate: PersonRow {
+        required property var modelData
+        app: ip.app
+        jid: modelData.jid
+        name: modelData.name ? String(modelData.name).replace(/^~/, "") : ip.wa.nameOf(modelData.jid)
+        sub: U.dayAt(modelData[st.at], ip.app.lang, ip.app.clock24)
+      }
+    }
+    Text {
+      textFormat: Text.PlainText
+      visible: st.remaining > 0
+      leftPadding: ip.t.sp(30)
+      topPadding: ip.t.sp(6)
+      bottomPadding: ip.t.sp(6)
+      text: ip.app.tr(st.remaining + " remaining", st.remaining + (st.remaining === 1 ? " restante" : " restantes"))
+      color: ip.t.dim
+      font.family: ip.t.font
+      font.pixelSize: ip.t.fsText
+    }
+  }
+  // When a message of yours reached a stage in a chat of two.
+  component Moment: Item {
+    id: mo
+    property string icon: "ticks"
+    property color tint: ip.t.dim
+    property string label: ""
+    property real ts: 0
+    width: parent ? parent.width : 0
+    height: ip.t.sp(68)
+    Icon { x: ip.t.sp(30); y: ip.t.sp(16); name: mo.icon; size: ip.t.sp(18); color: mo.tint }
+    Column {
+      x: ip.t.sp(62)
+      y: ip.t.sp(14)
+      spacing: ip.t.sp(3)
+      Text { textFormat: Text.PlainText; text: mo.label; color: ip.t.textBright; font.family: ip.t.font; font.pixelSize: ip.t.fsName - 1 }
+      Text { textFormat: Text.PlainText; text: mo.ts > 0 ? U.dayAt(mo.ts, ip.app.lang, ip.app.clock24) : "—"; color: ip.t.dim; font.family: ip.t.font; font.pixelSize: ip.t.fsSmall + 1 }
+    }
+  }
+
+  // One of yours as the chat draws it, then who played it (a voice note),
+  // read it and only got it, as WhatsApp Web's "Message info". It asks
+  // again whenever someone gets or reads it while it's open.
+  Component {
+    id: messageC
+    Flickable {
+      id: mf
+      readonly property var asked: ip.win.infoMsg
+      // As the chat has it now: its ticks move on.
+      readonly property var m: { if (!asked) return null; ip.wa.historyRev; return ip.wa.findMsg(asked.chat, asked.id) || asked }
+      readonly property var info: ip.wa.msgInfo && asked && ip.wa.msgInfo.chat === asked.chat && ip.wa.msgInfo.id === asked.id ? ip.wa.msgInfo : null
+      readonly property var receipts: info ? (info.receipts || []) : []
+      readonly property bool voice: !!m && m.kind === "ptt"
+      readonly property bool group: !!asked && asked.chat.indexOf("@g.us") > 0
+      readonly property int others: info && info.others !== undefined ? info.others : -1
+      readonly property var played: receipts.filter(function(r) { return r.played > 0 })
+      readonly property var read: receipts.filter(function(r) { return r.read > 0 })
+      readonly property var delivered: receipts.filter(function(r) { return r.delivered > 0 })
+      // In a chat of two, the other one's.
+      readonly property var one: receipts.length ? receipts[0] : null
+      function ask() { if (mf.asked) ip.wa.askMsgInfo(mf.asked) }
+      Component.onCompleted: ask()
+      onAskedChanged: ask()
+      Connections {
+        target: ip.wa
+        function onReceipted(chat, ids) { if (mf.asked && chat === mf.asked.chat && ids.indexOf(mf.asked.id) >= 0) mf.ask() }
+      }
+
+      contentHeight: mcol.implicitHeight + ip.t.sp(30)
+      clip: true
+      boundsBehavior: Flickable.StopAtBounds
+      ScrollBar.vertical: ThinScroll { app: ip.app }
+      Column {
+        id: mcol
+        width: parent.width
+
+        // The message, on the chat's own background, where yours go.
+        Rectangle {
+          width: parent.width
+          height: (bubble.item ? bubble.item.height : 0) + ip.t.sp(56)
+          color: ip.t.chatBg
+          Loader {
+            id: bubble
+            active: !!mf.m
+            x: parent.width - width - ip.t.sp(24)
+            y: ip.t.sp(28)
+            sourceComponent: Bubble {
+              app: ip.app
+              win: ip.win
+              m: mf.m
+              row: { var rs = Model.rows([mf.m], { group: false }, {}); return rs[rs.length - 1] }
+              maxWidth: mcol.width - ip.t.sp(64)
+            }
+          }
+          // Only to look at: its menu and actions are the chat's.
+          MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons }
+        }
+
+        // A group: each stage with who reached it and how many it hasn't.
+        Column {
+          width: parent.width
+          visible: mf.group && !!mf.info
+          Stage {
+            wanted: mf.voice
+            icon: "micFilled"
+            tint: ip.t.read
+            label: ip.app.tr("Played by", "Reproduzida por")
+            people: mf.played
+            at: "played"
+            remaining: mf.others < 0 ? -1 : mf.others - mf.played.length
+          }
+          Stage {
+            tint: ip.t.read
+            label: ip.app.tr("Read by", "Lida por")
+            people: mf.voice ? mf.read.filter(function(r) { return !r.played }) : mf.read
+            at: "read"
+            remaining: mf.others < 0 ? -1 : mf.others - mf.read.length
+          }
+          Stage {
+            label: ip.app.tr("Delivered to", "Entregue para")
+            people: mf.delivered.filter(function(r) { return !r.read })
+            at: "delivered"
+            remaining: mf.others < 0 ? -1 : mf.others - mf.delivered.length
+          }
+        }
+
+        // A chat of two: when each stage came.
+        Column {
+          width: parent.width
+          visible: !mf.group && !!mf.info
+          topPadding: ip.t.sp(8)
+          Moment { visible: mf.voice; icon: "micFilled"; tint: ip.t.read; label: ip.app.tr("Played", "Reproduzida"); ts: mf.one ? mf.one.played : 0 }
+          Moment { tint: ip.t.read; label: ip.app.tr("Read", "Lida"); ts: mf.one ? mf.one.read : 0 }
+          Moment { label: ip.app.tr("Delivered", "Entregue"); ts: mf.one ? mf.one.delivered : 0 }
+        }
+
+        Item {
+          width: parent.width
+          height: ip.t.sp(80)
+          visible: !mf.info
+          BusyIndicator { anchors.centerIn: parent; running: parent.visible; width: ip.t.sp(36); height: width }
+        }
       }
     }
   }

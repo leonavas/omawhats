@@ -389,6 +389,8 @@ Item {
   property var search: null
   property var chatSearch: null
   property var mediaList: null
+  // Who got and read one of yours (WhatsApp Web's "Message info"), as last asked.
+  property var msgInfo: null
   property var starred: null
   property var contacts: null
   property var stickers: null
@@ -398,6 +400,8 @@ Item {
   // ---------------------------------------------------------------- events
   signal incoming(var msg)
   signal reacted(var ev)
+  // Messages whose ticks moved: sent, or someone got, read or played them.
+  signal receipted(string chat, var ids)
   signal failed(string text)
 
   function handle(ev) {
@@ -524,6 +528,7 @@ Item {
       if (wa.histories[ev.chat]) { wa.histories[ev.chat].msgs = []; wa.historyRev++ }
       break
     case "status": {
+      wa.receipted(ev.chat, ev.ids || [])
       var hs = wa.histories[ev.chat]
       if (!hs) break
       var sids = ev.ids || []
@@ -615,6 +620,9 @@ Item {
     case "media_list":
       wa.mediaList = ev
       break
+    case "msg_info":
+      wa.msgInfo = ev
+      break
     case "contacts":
       wa.contacts = ev.contacts || []
       break
@@ -687,6 +695,7 @@ Item {
   function typingState(chat, state) { if (chat) wa.send({ c: "typing", chat: chat, state: state }) }
   function doSearch(q) { wa.send({ c: "search", text: q }) }
   function searchIn(chat, q) { wa.send({ c: "search", text: q, chat: chat }) }
+  function askMsgInfo(m) { wa.send({ c: "msg_info", chat: m.chat, id: m.id }) }
   function loadMediaList(chat, kind) { wa.mediaList = null; wa.send({ c: "media_list", chat: chat, kind: kind || "media" }) }
   function loadContacts() { wa.send({ c: "contacts" }) }
   function loadStickers() { wa.send({ c: "stickers" }) }

@@ -184,6 +184,7 @@ func (b *Bridge) forget(chat string, upTo int64, deleted bool) {
 	n, _ := res.RowsAffected()
 	b.db.Exec(`DELETE FROM media WHERE chat = ? AND id NOT IN (SELECT id FROM messages WHERE chat = ?)`, chat, chat)
 	b.db.Exec(`DELETE FROM reactions WHERE chat = ? AND id NOT IN (SELECT id FROM messages WHERE chat = ?)`, chat, chat)
+	b.db.Exec(`DELETE FROM receipts WHERE chat = ? AND id NOT IN (SELECT id FROM messages WHERE chat = ?)`, chat, chat)
 	var left int
 	b.db.QueryRow(`SELECT count(*) FROM messages WHERE chat = ?`, chat).Scan(&left)
 	switch {

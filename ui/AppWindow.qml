@@ -24,7 +24,9 @@ FloatingWindow {
   // chats, archived, newchat, newgroup, settings, starred
   property string sideView: "chats"
   property bool infoOpen: false
-  property string infoView: ""     // "", media, starred
+  property string infoView: ""     // "", media, starred, message
+  // The message of yours whose info the panel shows (infoView "message").
+  property var infoMsg: null
   // Whose info the panel shows: "" for the open chat's, or a person's
   // picked in it (a sender's name or picture, a mention, a reaction).
   property string infoChat: ""
@@ -72,6 +74,8 @@ FloatingWindow {
   function focusComposer() { if (main.item && main.item.focusComposer) main.item.focusComposer() }
   function focusSearch() { appWin.sideView = "chats"; if (side.item && side.item.focusSearch) side.item.focusSearch() }
   function openInfo(view) { appWin.infoChat = ""; appWin.infoView = view || ""; appWin.infoOpen = true }
+  // Who got and read one of your messages, beside the conversation.
+  function msgInfo(m) { appWin.infoMsg = m; appWin.openInfo("message") }
   // Someone's info beside the conversation, as the TUI's: the chat's own
   // when it's the open one.
   function showProfile(jid) {

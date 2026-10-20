@@ -147,6 +147,7 @@ func (b *Bridge) message(e *events.Message, status int) *Msg {
 			b.db.Exec(`UPDATE messages SET kind = 'revoked', text = '', x = '', edited = 0, card = '' WHERE chat = ? AND id = ?`, chat.String(), id)
 			b.db.Exec(`DELETE FROM media WHERE chat = ? AND id = ?`, chat.String(), id)
 			b.db.Exec(`DELETE FROM reactions WHERE chat = ? AND id = ?`, chat.String(), id)
+			b.db.Exec(`DELETE FROM receipts WHERE chat = ? AND id = ?`, chat.String(), id)
 		case waE2E.ProtocolMessage_MESSAGE_EDIT:
 			c, ok := contentOf(pm.GetEditedMessage())
 			if !ok {
@@ -523,6 +524,14 @@ func (b *Bridge) historyMessage(jid, chat types.JID, web *waWeb.WebMessageInfo) 
 		status = 2
 	}
 	b.message(evt, status)
+	// Who got and read it, for its info.
+	if web.GetKey().GetFromMe() {
+		for _, r := range web.GetUserReceipt() {
+			if j, err := types.ParseJID(r.GetUserJID()); err == nil && !b.mine(j) {
+				b.receipted(chat.String(), web.GetKey().GetID(), b.norm(j).String(), r.GetReceiptTimestamp(), r.GetReadTimestamp(), r.GetPlayedTimestamp())
+			}
+		}
+	}
 	// On its chat too, now that the row is there.
 	b.setBizName(chat.String(), biz)
 	for _, r := range web.GetReactions() {
@@ -542,22 +551,81 @@ func (b *Bridge) receipt(e *events.Receipt) {
 		b.dirty.Store(true)
 		emit(map[string]any{"t": "read", "chat": chat.String()})
 		return
+	}
+	ts := e.Timestamp.Unix()
+	if e.Timestamp.IsZero() {
+		ts = time.Now().Unix()
+	}
+	var status int
+	var delivered, read, played int64
+	switch e.Type {
 	case types.ReceiptTypeDelivered:
-		b.setStatus(chat, e.MessageIDs, 2)
+		status, delivered = 2, ts
 	case types.ReceiptTypeRead:
-		// In groups a read from one member isn't everyone's: it stays delivered.
-		if e.IsGroup {
-			b.setStatus(chat, e.MessageIDs, 2)
-		} else {
-			b.setStatus(chat, e.MessageIDs, 3)
-		}
+		status, read = 3, ts
 	case types.ReceiptTypePlayed:
-		if e.IsGroup {
-			b.setStatus(chat, e.MessageIDs, 2)
-		} else {
-			b.setStatus(chat, e.MessageIDs, 4)
+		status, played = 4, ts
+	default:
+		return
+	}
+	// Who it was, for the message's info (before the app hears of it and
+	// asks); your other devices aren't anyone.
+	if who := b.norm(e.Sender); !b.mine(who) {
+		for _, id := range e.MessageIDs {
+			b.receipted(chat.String(), id, who.String(), delivered, read, played)
 		}
 	}
+	if e.IsGroup {
+		b.groupTicks(chat, e.MessageIDs, status)
+		return
+	}
+	b.setStatus(chat, e.MessageIDs, status)
+}
+
+// groupTicks moves yours in a group on as its members' receipts come, as
+// WhatsApp does: delivered at the first, read (or played) once everyone
+// in it has.
+func (b *Bridge) groupTicks(chat types.JID, ids []types.MessageID, status int) {
+	others := 0
+	if status > 2 {
+		others = b.othersIn(chat)
+	}
+	by := map[int][]types.MessageID{}
+	for _, id := range ids {
+		s := 2
+		if others > 0 {
+			var read, played int
+			b.db.QueryRow(`SELECT coalesce(sum(read > 0), 0), coalesce(sum(played > 0), 0) FROM receipts WHERE chat = ? AND id = ?`,
+				chat.String(), id).Scan(&read, &played)
+			switch {
+			case played >= others:
+				s = 4
+			case read >= others:
+				s = 3
+			}
+		}
+		by[s] = append(by[s], id)
+	}
+	for s, ids := range by {
+		b.setStatus(chat, ids, s)
+	}
+}
+
+// receipted keeps when someone got, read or played one of your messages,
+// the first time of each: a play is also a read, a read also a delivery.
+func (b *Bridge) receipted(chat, id, user string, delivered, read, played int64) {
+	if played > 0 && (read == 0 || played < read) {
+		read = played
+	}
+	if read > 0 && (delivered == 0 || read < delivered) {
+		delivered = read
+	}
+	b.db.Exec(`INSERT INTO receipts (chat, id, user, delivered, read, played) VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT (chat, id, user) DO UPDATE SET
+			delivered = min(coalesce(nullif(delivered, 0), excluded.delivered), coalesce(nullif(excluded.delivered, 0), delivered)),
+			read = min(coalesce(nullif(read, 0), excluded.read), coalesce(nullif(excluded.read, 0), read)),
+			played = min(coalesce(nullif(played, 0), excluded.played), coalesce(nullif(excluded.played, 0), played))`,
+		chat, id, user, delivered, read, played)
 }
 
 func (b *Bridge) setStatus(chat types.JID, ids []types.MessageID, status int) {
