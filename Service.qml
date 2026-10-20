@@ -568,8 +568,16 @@ Item {
   }
   function showInFolder(path) { if (path) Quickshell.execDetached(["sh", "-c", 'nautilus --select "$1" 2>/dev/null || xdg-open "$(dirname "$1")"', "show", U.unfileUrl(path)]) }
 
-  // A video plays in mpv (Omarchy's player), in a window of its own: only
-  // the file, no youtube-dl and no playlist pointing elsewhere.
+  // The video playing in its bubble (that VisualMedia), one at a time;
+  // where one handed over to the viewer was ({chat, id, pos} in ms); and
+  // whether videos play silent.
+  property var video: null
+  property var videoResume: null
+  property bool videoMuted: false
+
+  // Videos play where they are (InlineVideo); without QtMultimedia, in mpv
+  // (Omarchy's player), in a window of its own: only the file, no
+  // youtube-dl and no playlist pointing elsewhere.
   function playVideo(path, loop) {
     if (!path) return
     var args = ["mpv", "--force-window=yes", "--title=WhatsApp", "--keep-open=no", "--ytdl=no", "--load-unsafe-playlists=no"]

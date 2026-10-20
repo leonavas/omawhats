@@ -55,7 +55,8 @@ Item {
     w = Math.max(w, nat(quoteLoader.item))
     w = Math.max(w, nat(partLoader.item))
     w = Math.max(w, nat(linkLoader.item))
-    w = Math.max(w, nat(textLoader.item))
+    // A photo's or video's caption wraps to it, as WhatsApp Web's.
+    if (!visual || kind === "card") w = Math.max(w, nat(textLoader.item))
     w = Math.max(w, nat(cardLoader.item))
     if (!textLoader.item || metaOver || jumbo) w = Math.max(w, meta.implicitWidth + (partLoader.item && !visual ? 0 : 0))
     return w
@@ -242,9 +243,10 @@ Item {
     height: b.t.sp(15)
     MetaContent { app: b.app; m: b.m; over: false }
   }
-  // Over a photo or video without caption: white, on a shade.
+  // Over a photo or video without caption: white, on a shade; not while a
+  // video playing there shows its bar.
   Rectangle {
-    visible: b.metaOver
+    visible: b.metaOver && !(partLoader.item && partLoader.item.controlsShown)
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     anchors.margins: b.t.sp(3)

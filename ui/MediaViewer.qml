@@ -7,7 +7,8 @@ import "../lib/Registry.js" as Reg
 // A photo over the whole window, as WhatsApp Web's viewer: who sent it and
 // when on top with download, forward and close, the picture in the middle
 // (← → for the chat's others), its caption, and the strip of the chat's
-// photos and videos at the bottom.
+// photos and videos at the bottom. A video plays there (space pauses it),
+// fetched when it isn't here yet, from where its bubble had it.
 Rectangle {
   id: mv
   property var app: Reg.service
@@ -19,7 +20,7 @@ Rectangle {
 
   color: t.alpha(t.dark ? t.bgDarker : t.bg, 0.97)
   focus: true
-  Component.onCompleted: { mv.forceActiveFocus(); mv.current = mv.msg; mv.fetch() }
+  Component.onCompleted: { mv.app.video = null; mv.forceActiveFocus(); mv.current = mv.msg; mv.fetch() }
 
   property var current: null
   // The chat's photos and videos, oldest first, from what's loaded.
@@ -37,6 +38,7 @@ Rectangle {
   }
   // The newest copy of the shown message (a download lands there).
   readonly property var shown: mv.index >= 0 ? mv.all[mv.index] : mv.current
+  readonly property bool isVideo: !!mv.shown && mv.shown.kind !== "image"
   function go(d) {
     var i = mv.index + d
     if (i < 0 || i >= mv.all.length) return
@@ -45,12 +47,13 @@ Rectangle {
   }
   function fetch() {
     var m = mv.shown
-    if (m && m.media && !m.media.file && m.kind === "image") mv.wa.download(m, false)
+    if (m && m.media && !m.media.file && (m.kind === "image" || !player.failed)) mv.wa.download(m, false)
   }
 
   Keys.onEscapePressed: mv.closed()
   Keys.onLeftPressed: mv.go(-1)
   Keys.onRightPressed: mv.go(1)
+  Keys.onSpacePressed: if (player.item) player.item.toggle()
 
   MouseArea { anchors.fill: parent; onClicked: mv.closed(); onWheel: wheel => { if (wheel.angleDelta.y > 0) mv.go(-1); else mv.go(1) } }
 
@@ -136,7 +139,7 @@ Rectangle {
       anchors.fill: parent
       source: mv.shown && mv.shown.media && mv.shown.media.thumb ? U.fileUrl(mv.shown.media.thumb) : ""
       fillMode: Image.PreserveAspectFit
-      visible: high.status !== Image.Ready
+      visible: high.status !== Image.Ready && !player.item
       smooth: true
       opacity: 0.6
     }
@@ -152,10 +155,32 @@ Rectangle {
       sourceSize.height: Math.ceil(stage.height * 1.5)
       MouseArea { anchors.centerIn: parent; width: high.paintedWidth; height: high.paintedHeight; onClicked: {} }
     }
-    BusyIndicator { anchors.centerIn: parent; running: !!mv.shown && mv.shown.kind === "image" && high.status !== Image.Ready && mv.wa.downloadState(mv.shown) === "busy" }
-    // A video: play it in mpv.
+    BusyIndicator { anchors.centerIn: parent; running: !!mv.shown && high.status !== Image.Ready && !player.item && mv.wa.downloadState(mv.shown) === "busy" }
+    // A video plays here, once it's here; without QtMultimedia, in mpv.
+    Loader {
+      id: player
+      anchors.fill: parent
+      readonly property string file: mv.isVideo && mv.shown.media ? (mv.shown.media.file || "") : ""
+      property bool failed: false
+      onFileChanged: player.load()
+      Component.onCompleted: player.load()
+      function load() {
+        if (!player.file || player.failed) { player.source = ""; return }
+        var m = mv.shown, r = mv.app.videoResume
+        mv.app.videoResume = null
+        player.setSource(Qt.resolvedUrl("InlineVideo.qml"), { file: player.file, loop: m.kind === "gif", fit: true,
+                                                              start: r && r.chat === m.chat && r.id === m.id ? r.pos : 0 })
+      }
+      onStatusChanged: if (status === Loader.Error) player.fail()
+      function fail() { player.failed = true; player.source = "" }
+    }
+    Connections {
+      target: player.item
+      ignoreUnknownSignals: true
+      function onFailed() { player.fail() }
+    }
     Rectangle {
-      visible: !!mv.shown && mv.shown.kind !== "image"
+      visible: mv.isVideo && !player.item && mv.wa.downloadState(mv.shown) !== "busy"
       anchors.centerIn: parent
       width: mv.t.sp(72); height: width; radius: width / 2
       color: Qt.rgba(0, 0, 0, 0.55)
@@ -163,7 +188,11 @@ Rectangle {
       MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
-        onClicked: { var m = mv.shown; mv.wa.whenDownloaded(m, function(p) { mv.app.playVideo(p, m.kind === "gif") }) }
+        onClicked: {
+          var m = mv.shown
+          if (player.failed) mv.wa.whenDownloaded(m, function(p) { mv.app.playVideo(p, m.kind === "gif") })
+          else mv.wa.download(m, false)
+        }
       }
     }
   }

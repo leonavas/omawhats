@@ -124,6 +124,10 @@ func (md *Media) fill(chat, id string, part *waE2E.Message) {
 			md.Thumb = framePath
 			return
 		}
+		// Here without a download (one you sent): its frame all the same.
+		if md.File != "" {
+			go poster(chat, id, md.File)
+		}
 	case part.GetAudioMessage() != nil:
 		x := part.GetAudioMessage()
 		md.Size = x.GetFileLength()
@@ -157,11 +161,18 @@ func (md *Media) fill(chat, id string, part *waE2E.Message) {
 
 // poster puts a sharper picture of a downloaded video in its bubble than
 // the small one its message carries: a frame, through ffmpeg when it's there.
+// Once at a time for each.
+var posting sync.Map
+
 func poster(chat, id, path string) {
 	out := thumbFile(chat, id, "frame")
 	if _, err := os.Stat(out); err == nil {
 		return
 	}
+	if _, busy := posting.LoadOrStore(out, true); busy {
+		return
+	}
+	defer posting.Delete(out)
 	tmp := out + ".tmp"
 	err := exec.Command("ffmpeg", "-v", "error", "-y", "-i", path, "-vf", "thumbnail=30,scale='min(720,iw)':-2",
 		"-frames:v", "1", "-f", "mjpeg", tmp).Run()
