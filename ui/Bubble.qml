@@ -393,8 +393,12 @@ Item {
 
       // A click leaves the keyboard in the message box; text selected with
       // the mouse takes it, so Ctrl+C reaches it (the selection clears once
-      // the keyboard moves on), as omaslack's.
-      onSelectedTextChanged: if (te.selectedText !== "" && !te.activeFocus) te.forceActiveFocus()
+      // the keyboard moves on), as omaslack's. A double-click past the text's
+      // end picks only the room kept for the time: nothing to select there.
+      onSelectedTextChanged: {
+        if (te.selectedText !== "" && te.selectedText.replace(/[\u200b\ufffc]/g, "") === "") { te.deselect(); return }
+        if (te.selectedText !== "" && !te.activeFocus) te.forceActiveFocus()
+      }
       // Typing goes on in the box: on the ShortcutOverride Qt sends before
       // the press itself, so the press lands there and nothing is lost.
       Keys.onShortcutOverride: event => { if (te.typing(event)) te.toComposer() }
