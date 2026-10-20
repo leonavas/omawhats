@@ -390,6 +390,47 @@ Item {
         acceptedButtons: Qt.NoButton
         cursorShape: te.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor
       }
+
+      // A click leaves the keyboard in the message box; text selected with
+      // the mouse takes it, so Ctrl+C reaches it (the selection clears once
+      // the keyboard moves on), as omaslack's.
+      onSelectedTextChanged: if (te.selectedText !== "" && !te.activeFocus) te.forceActiveFocus()
+      // Typing goes on in the box: on the ShortcutOverride Qt sends before
+      // the press itself, so the press lands there and nothing is lost.
+      Keys.onShortcutOverride: event => { if (te.typing(event)) te.toComposer() }
+      // Esc lets the selection go, not the chat; ↑ / ↓ stay here, not with
+      // the list around it.
+      Keys.onPressed: event => {
+        if (event.matches(StandardKey.Copy)) {
+          if (te.selectedText !== "") { te.copySelection(); event.accepted = true }
+          return
+        }
+        if (event.key === Qt.Key_Escape) { te.toComposer(); event.accepted = true; return }
+        if (te.typing(event)) { te.toComposer(); return }
+        if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) event.accepted = true
+      }
+      // A key that types (Shift at most): a character, Backspace, Enter.
+      function typing(event) {
+        if (!te.activeFocus || (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) return false
+        var k = event.key
+        if (k === Qt.Key_Backspace || k === Qt.Key_Return || k === Qt.Key_Enter) return true
+        var c = event.text.length ? event.text.charCodeAt(0) : 0
+        return c >= 32 && c !== 127
+      }
+      // The keyboard back to the chat's box (the info panel's copy has
+      // none, and keeps it), the selection let go.
+      function toComposer() {
+        for (var p = te.parent; p; p = p.parent) {
+          if (typeof p.focusComposer !== "function") continue
+          p.focusComposer()
+          if (!te.activeFocus) te.deselect()
+          return
+        }
+      }
+      // As plain text: lines as lines, without the room kept for the time.
+      function copySelection() {
+        b.app.copy(te.selectedText.replace(/[\u200b\ufffc]/g, "").replace(/[\u2028\u2029]/g, "\n"))
+      }
     }
   }
 
