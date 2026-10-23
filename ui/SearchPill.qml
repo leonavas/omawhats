@@ -34,31 +34,48 @@ Rectangle {
     hoverColor: "transparent"
     onClicked: { if (f.active) { input.text = ""; input.focus = false; f.escaped() } else input.forceActiveFocus() }
   }
-  TextInput {
-    id: input
+  // A one-line box as TextInput's: the text follows the cursor past the edge.
+  Flickable {
+    id: scroller
     anchors.left: lead.right
     anchors.leftMargin: f.t.sp(8)
     anchors.right: clearBtn.visible ? clearBtn.left : parent.right
     anchors.rightMargin: f.t.sp(10)
     anchors.verticalCenter: parent.verticalCenter
-    color: f.t.text
-    font.family: f.t.font
-    font.pixelSize: f.t.fsText
-    selectionColor: f.t.alpha(f.t.accent, 0.4)
-    selectedTextColor: f.t.textBright
+    height: input.height
+    contentWidth: input.width
+    contentHeight: input.height
     clip: true
-    Keys.onEscapePressed: { input.text = ""; input.focus = false; f.escaped() }
-    Keys.onReturnPressed: f.accepted()
-    Keys.onDownPressed: f.downPressed()
-    Text {
-      textFormat: Text.PlainText
-      anchors.fill: parent
-      verticalAlignment: Text.AlignVCenter
-      visible: input.text.length === 0
-      text: f.placeholder
-      color: f.t.faint
-      font: input.font
-      elide: Text.ElideRight
+    interactive: false
+    LineEdit {
+      id: input
+      width: Math.max(scroller.width, implicitWidth)
+      color: f.t.text
+      font.family: f.t.font
+      font.pixelSize: f.t.fsText
+      selectByMouse: true
+      selectionColor: f.t.alpha(f.t.accent, 0.4)
+      selectedTextColor: f.t.textBright
+      onCursorRectangleChanged: {
+        var r = input.cursorRectangle
+        if (r.x < scroller.contentX) scroller.contentX = r.x
+        else if (r.x + r.width > scroller.contentX + scroller.width) scroller.contentX = r.x + r.width - scroller.width
+      }
+      Keys.onEscapePressed: { input.text = ""; input.focus = false; f.escaped() }
+      Keys.onReturnPressed: f.accepted()
+      Keys.onEnterPressed: f.accepted()
+      Keys.onDownPressed: f.downPressed()
+      Text {
+        textFormat: Text.PlainText
+        width: scroller.width
+        height: parent.height
+        verticalAlignment: Text.AlignVCenter
+        visible: input.text.length === 0
+        text: f.placeholder
+        color: f.t.faint
+        font: input.font
+        elide: Text.ElideRight
+      }
     }
   }
   IconButton {

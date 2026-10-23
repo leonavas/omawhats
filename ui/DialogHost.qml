@@ -759,7 +759,7 @@ Item {
       visible: el.editing
       width: parent.width
       height: Math.max(input.contentHeight, host.t.sp(24)) + host.t.sp(12)
-      TextInput {
+      LineEdit {
         id: input
         y: host.t.sp(4)
         width: parent.width - count.width - ok.width - host.t.sp(12)
@@ -767,7 +767,7 @@ Item {
         font.family: host.t.font
         font.pixelSize: el.pixelSize
         font.weight: el.weight
-        wrapMode: el.wrap ? TextInput.Wrap : TextInput.NoWrap
+        wrapMode: el.wrap ? TextEdit.Wrap : TextEdit.NoWrap
         clip: !el.wrap
         maximumLength: el.limit
         selectByMouse: true

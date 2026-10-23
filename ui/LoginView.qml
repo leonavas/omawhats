@@ -244,18 +244,19 @@ Rectangle {
             color: "transparent"
             border.width: 1.5
             border.color: phone.activeFocus ? lv.t.accent : lv.t.lineStrong
-            TextInput {
+            LineEdit {
               id: phone
               anchors.fill: parent
               anchors.leftMargin: lv.t.sp(14)
               anchors.rightMargin: lv.t.sp(14)
-              verticalAlignment: TextInput.AlignVCenter
+              verticalAlignment: TextEdit.AlignVCenter
               color: lv.t.text
               font.family: lv.t.font
               font.pixelSize: lv.t.fsName
               inputMethodHints: Qt.ImhDialableCharactersOnly
               text: "+55 "
               Keys.onReturnPressed: lv.wa.pairPhone(phone.text)
+              Keys.onEnterPressed: lv.wa.pairPhone(phone.text)
             }
           }
           Rectangle {

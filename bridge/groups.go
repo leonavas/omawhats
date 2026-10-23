@@ -131,21 +131,14 @@ func download(url, path string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
-	tmp := path + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-	if err != nil {
-		return err
-	}
-	n, err := io.Copy(f, io.LimitReader(resp.Body, maxPicture+1))
-	f.Close()
-	if err == nil && n > maxPicture {
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxPicture+1))
+	if err == nil && len(data) > maxPicture {
 		err = errors.New("picture too large")
 	}
 	if err != nil {
-		os.Remove(tmp)
 		return err
 	}
-	return os.Rename(tmp, path)
+	return writeFile(path, data)
 }
 
 // profile is what WhatsApp's contact (or group) info panel shows, with the

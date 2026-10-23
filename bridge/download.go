@@ -4,8 +4,10 @@ package main
 // with it, and `download` fetches it into the cache on demand.
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/binary"
 	"errors"
 	"io"
 	"mime"
@@ -339,7 +341,41 @@ func (b *Bridge) sweep() {
 	}
 }
 
+// writeFile writes a picture the shell will show: a PNG without its text
+// and color-profile chunks (see pngSafe).
 func writeFile(path string, data []byte) error {
+	return writeRaw(path, pngSafe(data))
+}
+
+// pngSafe drops a PNG's tEXt, zTXt, iTXt and iCCP chunks: compressed, a few
+// kilobytes of them can grow to gigabytes in the shell's decoder, and the
+// pictures come from anyone. What isn't a PNG is left as it is.
+func pngSafe(data []byte) []byte {
+	sig := []byte("\x89PNG\r\n\x1a\n")
+	if !bytes.HasPrefix(data, sig) {
+		return data
+	}
+	out := append(make([]byte, 0, len(data)), sig...)
+	for p := len(sig); p+12 <= len(data); {
+		end := p + 12 + int(binary.BigEndian.Uint32(data[p:]))
+		if end > len(data) {
+			break
+		}
+		kind := string(data[p+4 : p+8])
+		switch kind {
+		case "tEXt", "zTXt", "iTXt", "iCCP":
+		default:
+			out = append(out, data[p:end]...)
+		}
+		if kind == "IEND" {
+			break
+		}
+		p = end
+	}
+	return out
+}
+
+func writeRaw(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
@@ -490,6 +526,10 @@ func (b *Bridge) fetch(part *waE2E.Message, path string) error {
 	}
 	if err != nil {
 		return err
+	}
+	// A document is kept as sent: the shell never draws it.
+	if part.GetDocumentMessage() != nil {
+		return writeRaw(path, data)
 	}
 	return writeFile(path, data)
 }
