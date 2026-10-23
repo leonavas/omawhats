@@ -545,12 +545,16 @@ func (b *Bridge) historyMessage(jid, chat types.JID, web *waWeb.WebMessageInfo) 
 func (b *Bridge) receipt(e *events.Receipt) {
 	chat := b.norm(e.Chat)
 	switch e.Type {
-	case types.ReceiptTypeReadSelf:
-		// Read on another device: no longer unread here either.
-		b.db.Exec(`UPDATE chats SET unread = 0, marked = 0 WHERE jid = ?`, chat.String())
-		b.dirty.Store(true)
-		emit(map[string]any{"t": "read", "chat": chat.String()})
+	case types.ReceiptTypeReadSelf, types.ReceiptTypePlayedSelf:
+		b.readElsewhere(chat.String(), e.MessageIDs)
 		return
+	case types.ReceiptTypeRead, types.ReceiptTypePlayed:
+		// With read receipts on, your other devices' reads come as plain
+		// ones, from you.
+		if e.IsFromMe {
+			b.readElsewhere(chat.String(), e.MessageIDs)
+			return
+		}
 	}
 	ts := e.Timestamp.Unix()
 	if e.Timestamp.IsZero() {
@@ -580,6 +584,27 @@ func (b *Bridge) receipt(e *events.Receipt) {
 		return
 	}
 	b.setStatus(chat, e.MessageIDs, status)
+}
+
+// readElsewhere keeps what you read on another device: no longer unread
+// here either, except what came after the newest of those messages.
+func (b *Bridge) readElsewhere(chat string, ids []types.MessageID) {
+	var upTo int64
+	for _, id := range ids {
+		var ts int64
+		if b.db.QueryRow(`SELECT ts FROM messages WHERE chat = ? AND id = ?`, chat, id).Scan(&ts) == nil {
+			upTo = max(upTo, ts)
+		}
+	}
+	newer := 0
+	if upTo > 0 {
+		b.db.QueryRow(`SELECT count(*) FROM messages WHERE chat = ? AND from_me = 0 AND ts > ?`, chat, upTo).Scan(&newer)
+	}
+	b.db.Exec(`UPDATE chats SET marked = 0, unread = min(unread, ?) WHERE jid = ?`, newer, chat)
+	b.dirty.Store(true)
+	if newer == 0 {
+		emit(map[string]any{"t": "read", "chat": chat})
+	}
 }
 
 // groupTicks moves yours in a group on as its members' receipts come, as
