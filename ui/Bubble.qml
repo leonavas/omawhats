@@ -398,9 +398,17 @@ Item {
       // the mouse takes it, so Ctrl+C reaches it (the selection clears once
       // the keyboard moves on), as omaslack's. A double-click past the text's
       // end picks only the room kept for the time: nothing to select there.
+      // Nor does a selection reaching the end take it in: Qt paints a selected
+      // image with a line of the selection's color across it.
       onSelectedTextChanged: {
-        if (te.selectedText !== "" && te.selectedText.replace(/[\u200b\ufffc]/g, "") === "") { te.deselect(); return }
-        if (te.selectedText !== "" && !te.activeFocus) te.forceActiveFocus()
+        if (te.selectedText === "") return
+        if (te.selectedText.replace(/[\u200b\ufffc]/g, "") === "") { te.deselect(); return }
+        var end = te.length - 1
+        if (te.spacerWidth > 0 && te.selectionEnd > end) {
+          if (te.cursorPosition === te.selectionStart) te.select(end, te.selectionStart)
+          else te.select(te.selectionStart, end)
+        }
+        if (!te.activeFocus) te.forceActiveFocus()
       }
       // Typing goes on in the box: on the ShortcutOverride Qt sends before
       // the press itself, so the press lands there and nothing is lost.
