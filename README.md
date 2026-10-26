@@ -57,7 +57,7 @@ omarchy plugin remove leonavas.whatsapp-claude && omarchy plugin add https://git
 - Replies, reactions, edits, delete for everyone, forward, star; read
   receipts, typing and online status.
 - A composer with formatting, emoji and stickers, attachments, pasted
-  images, voice recording, mentions and drafts.
+  images, voice recording, mentions (@everyone too) and drafts.
 - Contact and group info, business profiles with opening hours, and your own
   profile (name, about, photo).
 - English and Portuguese; zoom with Ctrl+= / Ctrl+-.
@@ -67,7 +67,7 @@ omarchy plugin remove leonavas.whatsapp-claude && omarchy plugin add https://git
 - **Badges**: red for unread direct chats, blue for groups. Muted and
   archived chats count in neither. "Group notifications" folds them into one.
 - **Hover** shows the unread chats with their newest messages; a click opens
-  the chat.
+  the chat, a middle click marks it read.
 - **Notifications** for new messages, except in muted chats, while paused, or
   for the chat on screen. Pause them for 30 minutes up to a chosen date.
 - **Scratchpad parking**: the window lives in a special workspace (Omarchy's

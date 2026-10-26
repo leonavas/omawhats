@@ -164,6 +164,48 @@ BarWidget {
     if (root.service) root.service.openChat(row.jid, row.msgId || "")
   }
 
+  // Middle click on a row of the card marks the chat read: the row goes
+  // first (its goAnim), then the read goes out, whether or not the card is
+  // still open. The rows are made again whenever the state moves, so the
+  // ones going are kept here by chat: one made again meanwhile comes back
+  // gone.
+  property var readLeaving: ({})
+  property int readLeavingRev: 0
+  property var readPending: []
+
+  function markRowRead(row) {
+    if (root.readLeaving[row.jid]) return false
+    root.readLeaving[row.jid] = true
+    root.readLeavingRev++
+    root.readPending.push(row.jid)
+    commitReadTimer.restart()
+    return true
+  }
+
+  function commitReads() {
+    var list = root.readPending
+    root.readPending = []
+    if (root.wa) list.forEach(function(jid) { root.wa.chatAction(jid, "read") })
+    readSweepTimer.restart()
+  }
+
+  // After the row's going (goAnim).
+  Timer {
+    id: commitReadTimer
+    interval: 640
+    onTriggered: root.commitReads()
+  }
+
+  // The bridge answers with the chat read; a chat it didn't mark comes back.
+  Timer {
+    id: readSweepTimer
+    interval: 4000
+    onTriggered: {
+      for (var jid in root.readLeaving) if (root.readPending.indexOf(jid) < 0) delete root.readLeaving[jid]
+      root.readLeavingRev++
+    }
+  }
+
   function pause(minutes) { if (root.service) root.service.pause(minutes) }
   function resume() { if (root.service) root.service.resume() }
 
@@ -734,11 +776,35 @@ BarWidget {
           readonly property color kindColor: chatRow.isGroup ? root.groupColor : root.directColor
           readonly property int indent: Math.round(Style.font.bodySmall * 1.5)
 
+          // Marked read with a middle click (root.markRowRead), it is seen
+          // go: its count turns into a check over a tint of its color, then
+          // it slides out to the right and closes up.
+          readonly property bool leaving: root.readLeavingRev >= 0 && !!root.readLeaving[chatRow.modelData.jid]
+          property real checked: 0
+          property real slid: 0
+          property real folded: 0
+
           width: previewColumn.width
-          height: chatInner.implicitHeight + Style.space(12)
+          height: Math.round((chatInner.implicitHeight + Style.space(12)) * (1 - chatRow.folded))
+          visible: chatRow.folded < 1
+          clip: chatRow.folded > 0
           radius: Style.spacing.labelGap
-          color: rowArea.containsMouse
-            ? Qt.rgba(popup.fg.r, popup.fg.g, popup.fg.b, 0.08) : "transparent"
+          color: chatRow.checked > 0
+            ? Qt.rgba(chatRow.kindColor.r, chatRow.kindColor.g, chatRow.kindColor.b, 0.2 * Math.min(1, chatRow.checked) * (1 - chatRow.slid))
+            : rowArea.containsMouse ? Qt.rgba(popup.fg.r, popup.fg.g, popup.fg.b, 0.08) : "transparent"
+
+          // Made again while going: it stays gone. Its chat dropped with the
+          // row still here (the read didn't take): it comes back.
+          Component.onCompleted: if (chatRow.leaving) { chatRow.checked = 1; chatRow.slid = 1; chatRow.folded = 1 }
+          onLeavingChanged: if (!chatRow.leaving) { goAnim.stop(); chatRow.checked = 0; chatRow.slid = 0; chatRow.folded = 0 }
+
+          SequentialAnimation {
+            id: goAnim
+            NumberAnimation { target: chatRow; property: "checked"; to: 1; duration: 180; easing.type: Easing.OutBack }
+            PauseAnimation { duration: 110 }
+            NumberAnimation { target: chatRow; property: "slid"; to: 1; duration: 190; easing.type: Easing.InCubic }
+            NumberAnimation { target: chatRow; property: "folded"; to: 1; duration: 150; easing.type: Easing.InOutQuad }
+          }
 
           Column {
             id: chatInner
@@ -748,6 +814,8 @@ BarWidget {
             anchors.leftMargin: Style.space(6)
             anchors.rightMargin: Style.space(6)
             spacing: Style.space(3)
+            opacity: 1 - chatRow.slid
+            transform: Translate { x: Math.round(chatRow.slid * Style.space(40)) }
 
             Item {
               width: parent.width
@@ -788,6 +856,7 @@ BarWidget {
                 height: Math.round(countText.contentHeight + Style.space(2))
                 radius: height / 2
                 color: chatRow.kindColor
+                opacity: 1 - Math.min(1, chatRow.checked)
                 anchors.right: timeText.left
                 anchors.rightMargin: timeText.text !== "" ? Style.space(8) : 0
                 anchors.verticalCenter: nameText.verticalCenter
@@ -806,6 +875,20 @@ BarWidget {
                   font.pixelSize: Style.font.caption
                   font.bold: true
                 }
+              }
+
+              // The check the count turns into as the row is marked read.
+              Text {
+                visible: chatRow.checked > 0
+                opacity: Math.min(1, chatRow.checked)
+                scale: 0.4 + 0.6 * chatRow.checked
+                anchors.centerIn: marker
+                textFormat: Text.PlainText
+                text: "󰄬"
+                color: chatRow.kindColor
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                font.bold: true
               }
 
               Text {
@@ -845,9 +928,15 @@ BarWidget {
           MouseArea {
             id: rowArea
             anchors.fill: parent
+            z: 1
             hoverEnabled: true
+            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
             cursorShape: Qt.PointingHandCursor
-            onClicked: root.openConversation(chatRow.modelData)
+            onClicked: function (mouse) {
+              if (chatRow.leaving) return
+              if (mouse.button !== Qt.MiddleButton) root.openConversation(chatRow.modelData)
+              else if (root.markRowRead(chatRow.modelData)) goAnim.start()
+            }
           }
         }
       }

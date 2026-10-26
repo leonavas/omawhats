@@ -52,6 +52,7 @@ Item {
     stdout: StdioCollector { onStreamFinished: root._zone = String(text).replace(/^.*zoneinfo\//, "").trim() }
   }
   readonly property string lang: setting("lang", root._ptHint ? "pt-BR" : "en")
+  onLangChanged: F.setEveryone(root.tr("everyone", "todos"))
   readonly property bool clock24: setting("clock", "24h") !== "12h"
   readonly property bool enterSends: setting("enterSends", true) !== false
   // Desktop notifications and their text are the bar widget's settings
@@ -662,6 +663,7 @@ Item {
   }
 
   Component.onCompleted: {
+    F.setEveryone(root.tr("everyone", "todos"))
     folders.running = true
     Registry.service = root
     // Pasted pictures and voice notes recorded: a day is enough.

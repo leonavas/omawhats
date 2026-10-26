@@ -23,11 +23,16 @@ func (b *Bridge) readOnly(chat string) string {
 }
 
 // mentionedJIDs are the people the text's @s name: the ones the app picked,
-// and any @number in it.
-func (b *Bridge) mentionedJIDs(text string) []string {
-	var out []string
+// and any @number in it. An "@all" in a group names everyone (all), as
+// WhatsApp's "@everyone": every member goes along too, for the apps that
+// only know mentions by number.
+func (b *Bridge) mentionedJIDs(chat types.JID, text string) (out []string, all bool) {
 	got := map[string]bool{}
 	for i := 0; i < len(text); i++ {
+		if chat.Server == types.GroupServer && allAt(text, i) {
+			all = true
+			continue
+		}
 		user, end := mentionAt(text, i)
 		if user == "" || got[user] {
 			continue
@@ -40,7 +45,20 @@ func (b *Bridge) mentionedJIDs(text string) []string {
 		}
 		out = append(out, types.NewJID(user, server).String())
 	}
-	return out
+	if all {
+		if g, err := b.cli.GetGroupInfo(b.ctx, chat); err == nil {
+			me := b.me()
+			for _, p := range g.Participants {
+				j := p.JID
+				if j.User == me.User || p.PhoneNumber.User == me.User || got[j.User] || got[p.PhoneNumber.User] {
+					continue
+				}
+				got[j.User] = true
+				out = append(out, j.String())
+			}
+		}
+	}
+	return out, all
 }
 
 // send shows the message right away (pending) and again once the server took it.
@@ -59,14 +77,17 @@ func (b *Bridge) send(c Cmd) {
 	now := time.Now().Unix()
 	out := &waE2E.Message{Conversation: proto.String(text)}
 	q := b.quoting(c.Chat, c.Reply)
-	mentioned := b.mentionedJIDs(text)
+	mentioned, all := b.mentionedJIDs(jid, text)
 	link := firstURL(text)
-	if q != nil || len(mentioned) > 0 || link != "" {
+	if q != nil || len(mentioned) > 0 || all || link != "" {
 		ci := &waE2E.ContextInfo{}
 		if q != nil {
 			ci = q.ctx
 		}
 		ci.MentionedJID = mentioned
+		if all {
+			ci.NonJIDMentions = proto.Uint32(1)
+		}
 		ext := &waE2E.ExtendedTextMessage{Text: proto.String(text), ContextInfo: ci}
 		if link != "" {
 			ext.MatchedText = proto.String(link)

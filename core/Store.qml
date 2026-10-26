@@ -691,7 +691,10 @@ Item {
   function deleteMsgs(chat, ids, everyone) { wa.send({ c: "delete_msgs", chat: chat, ids: ids, everyone: !!everyone }) }
   function star(chat, ids, on) { wa.send({ c: "star", chat: chat, ids: ids, action: on ? "star" : "unstar" }) }
   function forward(chat, ids, to) { wa.send({ c: "forward", chat: chat, ids: ids, to: to }) }
-  function chatAction(chat, action, secs) { wa.send({ c: "chat_action", chat: chat, action: action, secs: secs || 0 }) }
+  // Marking read sends no blue ticks with read receipts off, as opening it.
+  function chatAction(chat, action, secs) {
+    wa.send({ c: "chat_action", chat: chat, action: action, secs: secs || 0, quiet: action === "read" && !wa.app.setting("readReceipts", true) })
+  }
   function typingState(chat, state) { if (chat) wa.send({ c: "typing", chat: chat, state: state }) }
   function doSearch(q) { wa.send({ c: "search", text: q }) }
   function searchIn(chat, q) { wa.send({ c: "search", text: q, chat: chat }) }

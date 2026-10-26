@@ -16,6 +16,8 @@ Item {
   property bool group: false
   property bool checked: false
   property bool checkable: false
+  // Picked with the keyboard (the @ list), shown as hovered.
+  property bool highlighted: false
   property string icon: ""
   property color iconBg: t.accent
   signal clicked()
@@ -27,7 +29,7 @@ Item {
     anchors.leftMargin: pr.t.sp(10)
     anchors.rightMargin: pr.t.sp(10)
     radius: pr.t.sp(10)
-    color: ma.containsMouse ? pr.t.hover : "transparent"
+    color: ma.containsMouse || pr.highlighted ? pr.t.hover : "transparent"
   }
   Avatar {
     id: pic

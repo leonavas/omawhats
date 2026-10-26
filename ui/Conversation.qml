@@ -72,7 +72,9 @@ Item {
 
   // The message you're answering.
   property var replyTo: null
-  onChatChanged: { conv.replyTo = null; conv.endSelect() }
+  // The view stays as the chat changes: a group's members (for @) are
+  // asked for each one.
+  onChatChanged: { conv.replyTo = null; conv.endSelect(); if (conv.group || !conv.info) conv.wa.askProfile(conv.chat) }
 
   function focusComposer() { composer.focusInput() }
   function reply(m) { conv.replyTo = m; composer.focusInput() }

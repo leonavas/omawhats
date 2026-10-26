@@ -66,22 +66,31 @@ Item {
   }
 
   // ------------------------------------------------------------ mentions
-  // "@Name" in the box stands for "@number" in what's sent.
+  // "@Name" in the box stands for "@number" in what's sent (the hidden id
+  // when the number isn't known), and "@todos" for "@all": everyone, as
+  // WhatsApp Web's first row. ↑ ↓ pick in the list, Enter or Tab take it.
   property var mentionNames: ({})
   property string mentionQuery: ""
   property int mentionAt: -1
+  property int mentionIndex: 0
   readonly property var members: {
     var p = box.wa.profile(box.chat)
     return p && p.members ? p.members.filter(function(x) { return !x.me }) : []
   }
+  readonly property string everyoneWord: box.app.tr("everyone", "todos")
   readonly property var mentionMatches: {
     if (box.mentionAt < 0) return []
     var q = U.fold(box.mentionQuery)
-    return box.members.filter(function(x) {
+    var out = box.members.filter(function(x) {
       var n = x.name || x.push || x.phone
       return !q || U.fold(n).indexOf(q) >= 0 || String(x.phone).indexOf(q) >= 0
-    }).slice(0, 8)
+    })
+    if (box.members.length && (U.fold(box.everyoneWord).indexOf(q) === 0 || "all".indexOf(q) === 0)) out.unshift({ all: true })
+    return out
   }
+  onMentionQueryChanged: box.mentionIndex = 0
+  onMentionAtChanged: box.mentionIndex = 0
+  onMentionIndexChanged: mentionList.positionViewAtIndex(box.mentionIndex, ListView.Contain)
   function checkMention() {
     if (!box.group) { box.mentionAt = -1; return }
     var upto = input.text.slice(0, input.cursorPosition)
@@ -90,7 +99,7 @@ Item {
     else box.mentionAt = -1
   }
   function pickMention(x) {
-    var name = x.name || (x.push ? x.push : U.phone(x.phone))
+    var name = x.all ? box.everyoneWord : x.name || (x.push ? x.push : U.phone(x.phone))
     var label = "@" + name
     var start = box.mentionAt
     var end = input.cursorPosition
@@ -98,7 +107,7 @@ Item {
     input.insert(start, label + " ")
     input.cursorPosition = start + label.length + 1
     var map = box.mentionNames
-    map[label] = "@" + x.phone
+    map[label] = x.all ? "@all" : "@" + (x.phone || String(x.jid).split("@")[0])
     box.mentionNames = map
     box.mentionAt = -1
   }
@@ -277,26 +286,35 @@ Item {
     y: panel.visible ? panel.height : 0
     x: box.t.sp(16)
     width: Math.min(parent.width - box.t.sp(32), box.t.sp(420))
-    height: visible ? mcol.implicitHeight + box.t.sp(12) : 0
+    // Up to six rows and a half, the rest scrolled to.
+    height: visible ? Math.min(box.mentionMatches.length, 6.5) * box.t.sp(54) + box.t.sp(12) : 0
     radius: box.t.sp(12)
     color: box.t.popup
     border.width: 1
     border.color: box.t.line
-    Column {
-      id: mcol
+    ListView {
+      id: mentionList
       y: box.t.sp(6)
       width: parent.width
-      Repeater {
-        model: box.mentionMatches
-        delegate: PersonRow {
-          required property var modelData
-          app: box.app
-          height: box.t.sp(54)
-          jid: modelData.jid
-          name: modelData.name || ("~" + (modelData.push || U.phone(modelData.phone)))
-          sub: modelData.name ? (modelData.push ? "~" + modelData.push : "") : U.phone(modelData.phone)
-          onClicked: box.pickMention(modelData)
-        }
+      height: parent.height - box.t.sp(12)
+      clip: true
+      boundsBehavior: Flickable.StopAtBounds
+      model: box.mentionMatches
+      ScrollBar.vertical: ThinScroll { app: box.app }
+      delegate: PersonRow {
+        required property var modelData
+        required property int index
+        app: box.app
+        width: mentionList.width
+        height: box.t.sp(54)
+        highlighted: index === box.mentionIndex
+        icon: modelData.all ? "groupFilled" : ""
+        iconBg: box.t.composer
+        jid: modelData.all ? "" : modelData.jid
+        name: modelData.all ? box.everyoneWord : modelData.name || ("~" + (modelData.push || U.phone(modelData.phone)))
+        sub: modelData.all ? box.app.tr("Mention everyone in the group", "Mencione todos os membros do grupo")
+           : modelData.name ? (modelData.push ? "~" + modelData.push : "") : U.phone(modelData.phone)
+        onClicked: { box.pickMention(modelData); input.forceActiveFocus() }
       }
     }
   }
@@ -427,8 +445,14 @@ Item {
             }
             if (event.key === Qt.Key_Escape) { box.emojiDismissed = box.emojiAt; box.emojiAt = -1; event.accepted = true; return }
           }
+          if (mentions.visible) {
+            var n = box.mentionMatches.length
+            if (event.key === Qt.Key_Up) { box.mentionIndex = (box.mentionIndex - 1 + n) % n; event.accepted = true; return }
+            if (event.key === Qt.Key_Down) { box.mentionIndex = (box.mentionIndex + 1) % n; event.accepted = true; return }
+            if (event.key === Qt.Key_Tab) { box.pickMention(box.mentionMatches[Math.min(box.mentionIndex, n - 1)]); event.accepted = true; return }
+          }
           if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
-            if (box.mentionAt >= 0 && box.mentionMatches.length) { box.pickMention(box.mentionMatches[0]); event.accepted = true; return }
+            if (box.mentionAt >= 0 && box.mentionMatches.length) { box.pickMention(box.mentionMatches[Math.min(box.mentionIndex, box.mentionMatches.length - 1)]); event.accepted = true; return }
             if (box.app.enterSends ? !shift : ctrl) { box.send(); event.accepted = true }
             return
           }

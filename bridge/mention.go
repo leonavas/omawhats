@@ -17,6 +17,14 @@ type Mention struct {
 	Name string `json:"name"`
 	// It's you.
 	Me bool `json:"me,omitempty"`
+	// It's everyone in the group: "@all" in the text, which WhatsApp shows
+	// as "@everyone" in your language.
+	All bool `json:"all,omitempty"`
+}
+
+// allAt is whether an "@all" (everyone in the group) starts at i.
+func allAt(t string, i int) bool {
+	return strings.HasPrefix(t[i:], "@all") && (i == 0 || !isWord(t[i-1])) && (i+4 == len(t) || !isWord(t[i+4]))
 }
 
 // mentionAt finds the digits of an @ starting at i: at a word's start, five
@@ -45,6 +53,12 @@ func (b *Bridge) mentions(text string, seen map[string]*Mention) []Mention {
 	var out []Mention
 	got := map[string]bool{}
 	for i := 0; i < len(text); i++ {
+		if allAt(text, i) && !got["all"] {
+			got["all"] = true
+			out = append(out, Mention{User: "all", All: true})
+			i += 3
+			continue
+		}
 		user, end := mentionAt(text, i)
 		if user == "" || got[user] {
 			continue
