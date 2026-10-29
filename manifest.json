@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "leonavas.omawhats",
   "name": "Omawhats",
-  "version": "0.2.13",
+  "version": "0.2.14",
   "author": "leonavas",
   "license": "Apache-2.0",
   "description": "A whole WhatsApp client inside the Omarchy shell: WhatsApp Web's layout drawn in the theme's colors, linked to your phone as one more device (a small Go bridge on whatsmeow, built on first run through mise). The bar icon opens it and badges what's waiting.",

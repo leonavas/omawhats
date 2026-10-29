@@ -169,6 +169,9 @@ Item {
     ScrollBar.vertical: ThinScroll { app: root.app }
     flickDeceleration: 4000
     maximumFlickVelocity: 6000
+    // The wheel / touchpad, further than Qt's: the reader scrolling.
+    WheelScroll { view: list; step: root.t.sp(160); onWheeled: { root._followUntil = 0; wheelOff.restart() } }
+    Timer { id: wheelOff; interval: 600 }
 
     delegate: MessageRow {
       required property var modelData
@@ -199,7 +202,7 @@ Item {
     function show() {
       var it = list.itemAt(list.width / 2, list.contentY + root.t.sp(30))
       if (it && it.row && (it.row.ts || (it.row.m && it.row.m.ts))) label = U.dayLabel(it.row.ts || it.row.m.ts, root.app.lang)
-      if (!list.moving && !list.dragging) return
+      if (!list.moving && !list.dragging && !wheelOff.running) return
       opacity = 1
       hideChip.restart()
     }

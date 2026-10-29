@@ -159,6 +159,8 @@ Item {
     model: ScriptModel { values: cv.rows; objectProp: "jid" }
     ScrollBar.vertical: ThinScroll { app: cv.app }
     keyNavigationEnabled: true
+    // The wheel / touchpad, further than Qt's.
+    WheelScroll { view: list; step: cv.t.sp(130) }
 
     header: Column {
       width: list.width
