@@ -92,7 +92,8 @@ All of them only yours (folders `0700`, files `0600`):
 - `~/.local/share/omawhats/`: the session, the message store, avatars,
   the built bridge and its log.
 - `~/.cache/omawhats/`: downloaded media, and Go's module and build caches
-  for the bridge (`go/`).
+  for the bridge (`go/`). Media not seen in 7 days goes; over 900 MB, the
+  Go build cache goes, then the media seen longest ago.
 - Go itself, which `mise` keeps in `~/.local/share/mise/installs/go/`.
 
 Log out from Settings (or unlink the device on your phone) to end the

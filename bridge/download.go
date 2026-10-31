@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -325,8 +326,16 @@ func touch(paths ...string) {
 	}
 }
 
-// sweep removes, at start and once a day, the media not seen and the
-// profile pictures not asked for (fetched at most daily) in keepUnseen.
+// The cache folder, Go's caches included, kept under this. Media seen in
+// the last keepSeen stays even over it: it may be on screen or playing.
+const (
+	cacheBudget = 900 << 20
+	keepSeen    = time.Hour
+)
+
+// sweep removes, at start and once an hour, the media not seen and the
+// profile pictures not asked for (fetched at most daily) in keepUnseen,
+// then trims the cache to cacheBudget.
 func (b *Bridge) sweep() {
 	for {
 		for _, dir := range []string{mediaDir(), filepath.Join(b.dir, "avatars")} {
@@ -337,8 +346,65 @@ func (b *Bridge) sweep() {
 				}
 			}
 		}
-		time.Sleep(24 * time.Hour)
+		trimCache()
+		time.Sleep(time.Hour)
 	}
+}
+
+// trimCache brings the cache under cacheBudget: first Go's build cache
+// (the bridge is built already; the next update builds it again), then the
+// media least recently seen. Go's module cache stays, so an update builds
+// offline.
+func trimCache() {
+	total := dirSize(cacheRoot)
+	if total <= cacheBudget {
+		return
+	}
+	build := filepath.Join(cacheRoot, "go", "build")
+	if size := dirSize(build); size > 0 && os.RemoveAll(build) == nil {
+		logf("cache %d MB: Go build cache removed (%d MB)", total>>20, size>>20)
+		total -= size
+	}
+	type file struct {
+		path string
+		size int64
+		seen time.Time
+	}
+	var files []file
+	entries, _ := os.ReadDir(mediaDir())
+	for _, e := range entries {
+		if info, err := e.Info(); err == nil && info.Mode().IsRegular() && !strings.HasSuffix(e.Name(), ".tmp") {
+			files = append(files, file{filepath.Join(mediaDir(), e.Name()), info.Size(), info.ModTime()})
+		}
+	}
+	slices.SortFunc(files, func(a, b file) int { return a.seen.Compare(b.seen) })
+	var freed int64
+	for _, f := range files {
+		if total <= cacheBudget || time.Since(f.seen) < keepSeen {
+			break
+		}
+		if os.Remove(f.path) == nil {
+			total -= f.size
+			freed += f.size
+		}
+	}
+	if freed > 0 {
+		logf("cache over budget: %d MB of media removed, %d MB left", freed>>20, total>>20)
+	}
+}
+
+// dirSize is what the regular files under dir take, in bytes.
+func dirSize(dir string) int64 {
+	var n int64
+	filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
+		if err == nil && d.Type().IsRegular() {
+			if info, err := d.Info(); err == nil {
+				n += info.Size()
+			}
+		}
+		return nil
+	})
+	return n
 }
 
 // writeFile writes a picture the shell will show: a PNG without its text
