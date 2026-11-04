@@ -5,12 +5,12 @@ package main
 
 import (
 	"bytes"
-	"math"
 	"image"
 	"image/color"
 	_ "image/gif"
 	"image/jpeg"
 	_ "image/png"
+	"math"
 	"mime"
 	"net/http"
 	"os"
@@ -38,14 +38,15 @@ var inline = map[string][]string{
 
 // One file on its way: shown pending at once, uploaded in order.
 type outFile struct {
-	cmd  Cmd
-	jid  types.JID
-	id   types.MessageID
-	ts   int64
-	kind string
-	mime string
-	name string
-	msg  *waE2E.Message
+	cmd     Cmd
+	jid     types.JID
+	id      types.MessageID
+	ts      int64
+	expires int64
+	kind    string
+	mime    string
+	name    string
+	msg     *waE2E.Message
 	// Text to send once the file's gone.
 	after string
 	// The message it replies to.
@@ -113,6 +114,7 @@ func (b *Bridge) sendFile(c Cmd) {
 	if o.quote = b.quoting(c.Chat, c.Reply); o.quote != nil {
 		setContext(o.msg, o.quote.ctx)
 	}
+	o.expires = b.outgoingDeadline(c.Chat, o.msg, o.ts)
 	b.storeFile(o, 0)
 	fileOnce.Do(func() {
 		go func() {
@@ -128,10 +130,10 @@ func (b *Bridge) sendFile(c Cmd) {
 func (b *Bridge) storeFile(o outFile, status int) {
 	c, _ := contentOf(o.msg)
 	qID, qFrom, qKind, qText, qThumb := o.quote.cols()
-	b.db.Exec(`INSERT INTO messages (chat, id, sender, from_me, ts, kind, text, quote_id, quote_from, quote_kind, quote_text, quote_thumb, status)
-		VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (chat, id) DO UPDATE SET kind = excluded.kind, text = excluded.text, status = excluded.status`,
-		o.cmd.Chat, o.id, b.me().String(), o.ts, c.Kind, c.Text, qID, qFrom, qKind, qText, qThumb, status)
+	b.db.Exec(`INSERT INTO messages (chat, id, sender, from_me, ts, kind, text, quote_id, quote_from, quote_kind, quote_text, quote_thumb, status, expires_at)
+		VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (chat, id) DO UPDATE SET kind = excluded.kind, text = excluded.text, status = excluded.status WHERE `+liveMessage,
+		o.cmd.Chat, o.id, b.me().String(), o.ts, c.Kind, c.Text, qID, qFrom, qKind, qText, qThumb, status, o.expires)
 	// No keys yet: it plays from the copy in the cache until it's uploaded.
 	md, _ := mediaOf(o.msg)
 	b.storeMedia(o.cmd.Chat, o.id, md, nil, o.jid.String(), b.me().String())
@@ -149,11 +151,20 @@ func (b *Bridge) uploadFile(o outFile) {
 		b.setStatus(o.jid, []types.MessageID{o.id}, -1)
 		fail("send_file", err)
 	}
+	if !b.messageLive(o.cmd.Chat, o.id) {
+		return
+	}
 	// Ours plays (or opens) without a download.
 	if md, _ := mediaOf(o.msg); md != nil {
+		b.mediaMu.Lock()
+		if !b.messageLive(o.cmd.Chat, o.id) {
+			b.mediaMu.Unlock()
+			return
+		}
 		if err := linkOrCopy(o.cmd.Path, mediaFile(o.cmd.Chat, o.id, md.Mime)); err != nil {
 			logf("media cache %s: %v", o.id, err)
 		}
+		b.mediaMu.Unlock()
 	}
 	media := map[string]whatsmeow.MediaType{
 		"image": whatsmeow.MediaImage, "video": whatsmeow.MediaVideo, "audio": whatsmeow.MediaAudio, "ptt": whatsmeow.MediaAudio,
@@ -233,6 +244,9 @@ func (b *Bridge) uploadFile(o outFile) {
 		b.storeMedia(o.cmd.Chat, o.id, md, part, o.jid.String(), b.me().String())
 		// Its bubble gets the picture, length and waveform now.
 		b.emitMsg(o.cmd.Chat, o.id)
+	}
+	if !b.messageLive(o.cmd.Chat, o.id) {
+		return
 	}
 	if _, err := b.cli.SendMessage(b.ctx, o.jid, o.msg, whatsmeow.SendRequestExtra{ID: o.id}); err != nil {
 		failed(err)

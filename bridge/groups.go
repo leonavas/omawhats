@@ -29,6 +29,7 @@ func (b *Bridge) syncGroups() {
 	me, myLID := b.me(), b.cli.Store.GetLID().ToNonAD()
 	joined := map[string]bool{}
 	for _, g := range groups {
+		b.setDisappearing(g.JID.String(), g.DisappearingTimer, time.Now().Unix())
 		readOnly := ""
 		if g.IsAnnounce {
 			readOnly = adminsOnly

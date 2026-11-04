@@ -72,6 +72,15 @@ Item {
 
   // The message you're answering.
   property var replyTo: null
+  Connections {
+    target: conv.wa
+    function onMessagesRemoved(chat, ids) {
+      if (conv.chat !== chat) return
+      if (conv.replyTo && ids.indexOf(conv.replyTo.id) >= 0) conv.replyTo = null
+      ids.forEach(function(id) { delete conv.selected[id] })
+      conv.selectedRev++
+    }
+  }
   // The view stays as the chat changes: a group's members (for @) are
   // asked for each one.
   onChatChanged: { conv.replyTo = null; conv.endSelect(); if (conv.group || !conv.info) conv.wa.askProfile(conv.chat) }

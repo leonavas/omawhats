@@ -35,9 +35,9 @@ func (b *Bridge) react(chat, id, sender, emoji string, ts int64) {
 		return
 	}
 	// An older one (a history sync's) doesn't undo a newer.
-	b.db.Exec(`INSERT INTO reactions (chat, id, sender, emoji, ts) VALUES (?, ?, ?, ?, ?)
+	b.db.Exec(`INSERT INTO reactions (chat, id, sender, emoji, ts) SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS(SELECT 1 FROM messages WHERE chat=? AND id=? AND NOT (`+liveMessage+`))
 		ON CONFLICT (chat, id, sender) DO UPDATE SET emoji = excluded.emoji, ts = excluded.ts WHERE excluded.ts >= ts`,
-		chat, id, sender, emoji, ts)
+		chat, id, sender, emoji, ts, chat, id)
 }
 
 // reactionSender is who a reaction's key says sent it: you, the group's

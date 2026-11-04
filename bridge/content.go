@@ -7,6 +7,7 @@ package main
 // from the kind; nothing here is worded for a language.
 
 import (
+	"math"
 	"strings"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -74,12 +75,12 @@ func contentOf(m *waE2E.Message) (Content, bool) {
 			kind = "live_location"
 		}
 		return Content{Kind: kind, Text: x.GetComment(), Thumb: x.GetJPEGThumbnail(), X: map[string]any{"loc": map[string]any{
-			"lat": x.GetDegreesLatitude(), "lon": x.GetDegreesLongitude(), "name": x.GetName(), "addr": x.GetAddress(), "url": webURL(x.GetURL()),
+			"lat": coordinate(x.GetDegreesLatitude(), 90), "lon": coordinate(x.GetDegreesLongitude(), 180), "name": x.GetName(), "addr": x.GetAddress(), "url": webURL(x.GetURL()),
 		}}}, true
 	case m.GetLiveLocationMessage() != nil:
 		x := m.GetLiveLocationMessage()
 		return Content{Kind: "live_location", Text: x.GetCaption(), Thumb: x.GetJPEGThumbnail(), X: map[string]any{"loc": map[string]any{
-			"lat": x.GetDegreesLatitude(), "lon": x.GetDegreesLongitude(),
+			"lat": coordinate(x.GetDegreesLatitude(), 90), "lon": coordinate(x.GetDegreesLongitude(), 180),
 		}}}, true
 	case m.GetContactMessage() != nil:
 		x := m.GetContactMessage()
@@ -276,4 +277,12 @@ func stubOf(web *waWeb.WebMessageInfo) (Content, []string, bool) {
 		people = params
 	}
 	return Content{Kind: "system", X: map[string]any{"sys": sys}}, people, true
+}
+
+// Invalid coordinates must neither reach map arithmetic nor break JSON encoding.
+func coordinate(value, limit float64) any {
+	if math.IsNaN(value) || math.IsInf(value, 0) || math.Abs(value) > limit {
+		return nil
+	}
+	return value
 }

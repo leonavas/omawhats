@@ -59,6 +59,10 @@ func (b *Bridge) quoteOf(chat string, ci *waE2E.ContextInfo) (id, from, kind, te
 	if ci.GetQuotedMessage() == nil || ci.GetStanzaID() == "" {
 		return
 	}
+	b.stripExpiredQuote(chat, ci)
+	if ci.GetQuotedMessage() == nil {
+		return
+	}
 	id = ci.GetStanzaID()
 	if j, err := types.ParseJID(ci.GetParticipant()); err == nil && !j.IsEmpty() {
 		from = b.norm(j).String()
@@ -108,6 +112,12 @@ func (b *Bridge) quoteOf(chat string, ci *waE2E.ContextInfo) (id, from, kind, te
 // message stores a received (or history) message and returns it, or nil
 // when there's nothing to show. Edits and deletions update the stored one.
 func (b *Bridge) message(e *events.Message, status int) *Msg {
+	return b.storeIncoming(e, status, 0)
+}
+
+func (b *Bridge) storeIncoming(e *events.Message, status int, expires int64) *Msg {
+	b.messageMu.Lock()
+	defer b.messageMu.Unlock()
 	chat := b.norm(e.Info.Chat)
 	if skip(chat) || e.Message == nil {
 		return nil
@@ -141,6 +151,16 @@ func (b *Bridge) message(e *events.Message, status int) *Msg {
 		}
 	}
 	if pm != nil {
+		if pm.GetType() == waE2E.ProtocolMessage_EPHEMERAL_SETTING {
+			// Group settings come from authenticated group notifications instead.
+			if chat.Server != types.GroupServer && (e.Info.IsFromMe || b.sameSender(chat.String(), e.Info.Sender)) {
+				b.setDisappearing(chat.String(), pm.GetEphemeralExpiration(), pm.GetEphemeralSettingTimestamp())
+			}
+			return nil
+		}
+		if !b.mayMutate(e, pm) {
+			return nil
+		}
 		id := pm.GetKey().GetID()
 		switch pm.GetType() {
 		case waE2E.ProtocolMessage_REVOKE:
@@ -176,11 +196,23 @@ func (b *Bridge) message(e *events.Message, status int) *Msg {
 	if e.Info.IsFromMe {
 		sender = b.me()
 	}
+	if !b.mayReplace(chat.String(), e.Info.ID, sender, e.Info.IsFromMe) {
+		return nil
+	}
 	ci := contextOf(e.Message)
+	expires = earlierDeadline(expires, messageDeadline(e.Info.Timestamp.Unix(), ci.GetExpiration()))
+	// Missing timer metadata must not turn an explicitly ephemeral message permanent.
+	if e.IsEphemeral && expires == 0 {
+		expires = time.Now().Unix()
+	}
+	if expires > 0 && expires <= time.Now().Unix() {
+		b.db.Exec(`INSERT INTO messages (chat,id,sender,from_me,ts,kind,expires_at) VALUES (?,?,?,?,?,'expired',?) ON CONFLICT(chat,id) DO UPDATE SET expires_at = excluded.expires_at`, chat.String(), e.Info.ID, sender.String(), e.Info.IsFromMe, e.Info.Timestamp.Unix(), expires)
+		return nil
+	}
 	qID, qFrom, qKind, qText, qThumb := b.quoteOf(chat.String(), ci)
 	m := &Msg{
 		Chat: chat.String(), ID: e.Info.ID, Sender: sender.String(), FromMe: e.Info.IsFromMe,
-		TS: e.Info.Timestamp.Unix(), Kind: c.Kind, Text: c.Text, Status: status,
+		TS: e.Info.Timestamp.Unix(), ExpiresAt: expires, Kind: c.Kind, Text: c.Text, Status: status,
 	}
 	var card string
 	if lo := cardOf(e.Message); lo != nil {
@@ -199,8 +231,8 @@ func (b *Bridge) message(e *events.Message, status int) *Msg {
 	m.fresh = b.db.QueryRow(`SELECT kind FROM messages WHERE chat = ? AND id = ?`, m.Chat, m.ID).Scan(&had) != nil || had == "placeholder"
 	// A message the phone resends after a placeholder takes its place; an
 	// older copy (a history sync's) never undoes what came live.
-	_, err := b.db.Exec(`INSERT INTO messages (chat, id, sender, push_name, from_me, ts, kind, text, x, quote_id, quote_from, quote_kind, quote_text, quote_thumb, status, wa_sender, card, forwarded)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	_, err := b.db.Exec(`INSERT INTO messages (chat, id, sender, push_name, from_me, ts, kind, text, x, quote_id, quote_from, quote_kind, quote_text, quote_thumb, status, wa_sender, card, forwarded, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (chat, id) DO UPDATE SET
 			kind = CASE WHEN kind IN ('revoked') THEN kind ELSE excluded.kind END,
 			text = CASE WHEN kind = 'revoked' OR edited = 1 THEN text ELSE excluded.text END,
@@ -212,9 +244,10 @@ func (b *Bridge) message(e *events.Message, status int) *Msg {
 			quote_kind = CASE WHEN quote_kind = '' THEN excluded.quote_kind ELSE quote_kind END,
 			quote_text = CASE WHEN quote_text = '' THEN excluded.quote_text ELSE quote_text END,
 			quote_thumb = CASE WHEN quote_thumb = '' THEN excluded.quote_thumb ELSE quote_thumb END,
-			forwarded = max(forwarded, excluded.forwarded)`,
+			forwarded = max(forwarded, excluded.forwarded),
+            expires_at = CASE WHEN expires_at = 0 THEN excluded.expires_at WHEN excluded.expires_at = 0 THEN expires_at ELSE min(expires_at, excluded.expires_at) END`,
 		m.Chat, m.ID, m.Sender, e.Info.PushName, m.FromMe, m.TS, m.Kind, m.Text, x, qID, qFrom, qKind, qText, qThumb, m.Status,
-		e.Info.Sender.ToNonAD().String(), card, m.Forwarded)
+		e.Info.Sender.ToNonAD().String(), card, m.Forwarded, m.ExpiresAt)
 	if err != nil {
 		logf("store message %s: %v", m.ID, err)
 		return nil
@@ -369,6 +402,7 @@ func (b *Bridge) groupInfo(e *events.GroupInfo) {
 	}
 	if e.Ephemeral != nil {
 		add("ephemeral", e.Ephemeral.DisappearingTimer, nil)
+		b.setDisappearing(chat.String(), e.Ephemeral.DisappearingTimer, ts)
 	}
 	if len(e.Join) > 0 {
 		if !actor.IsEmpty() && !(len(e.Join) == 1 && e.Join[0].User == actor.User) {
@@ -444,6 +478,7 @@ func (b *Bridge) historySync(e *events.HistorySync) {
 				chat.String(), conv.GetName(), int64(conv.GetConversationTimestamp()), unread,
 				int64(conv.GetPinned()), conv.GetArchived(), mute, readOnly, jid.ToNonAD().String(), marked)
 		}
+		b.setDisappearing(chat.String(), conv.GetEphemeralExpiration(), conv.GetEphemeralSettingTimestamp())
 		for _, hm := range conv.GetMessages() {
 			b.historyMessage(jid, chat, hm.GetMessage())
 		}
@@ -523,7 +558,10 @@ func (b *Bridge) historyMessage(jid, chat types.JID, web *waWeb.WebMessageInfo) 
 	case s == 3:
 		status = 2
 	}
-	b.message(evt, status)
+	deadline := historyDeadline(web, evt.Info.Timestamp.Unix())
+	if b.storeIncoming(evt, status, deadline) == nil {
+		return
+	}
 	// Who got and read it, for its info.
 	if web.GetKey().GetFromMe() {
 		for _, r := range web.GetUserReceipt() {
@@ -645,12 +683,12 @@ func (b *Bridge) receipted(chat, id, user string, delivered, read, played int64)
 	if read > 0 && (delivered == 0 || read < delivered) {
 		delivered = read
 	}
-	b.db.Exec(`INSERT INTO receipts (chat, id, user, delivered, read, played) VALUES (?, ?, ?, ?, ?, ?)
+	b.db.Exec(`INSERT INTO receipts (chat, id, user, delivered, read, played) SELECT ?, ?, ?, ?, ?, ? WHERE NOT EXISTS(SELECT 1 FROM messages WHERE chat=? AND id=? AND NOT (`+liveMessage+`))
 		ON CONFLICT (chat, id, user) DO UPDATE SET
 			delivered = min(coalesce(nullif(delivered, 0), excluded.delivered), coalesce(nullif(excluded.delivered, 0), delivered)),
 			read = min(coalesce(nullif(read, 0), excluded.read), coalesce(nullif(excluded.read, 0), read)),
 			played = min(coalesce(nullif(played, 0), excluded.played), coalesce(nullif(excluded.played, 0), played))`,
-		chat, id, user, delivered, read, played)
+		chat, id, user, delivered, read, played, chat, id)
 }
 
 func (b *Bridge) setStatus(chat types.JID, ids []types.MessageID, status int) {

@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS messages (
 	-- Forwarded: its forwarding score, at least 1; 0 when it wasn't.
 	forwarded INTEGER NOT NULL DEFAULT 0,
 	starred INTEGER NOT NULL DEFAULT 0,
+	expires_at INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (chat, id)
 );
 CREATE INDEX IF NOT EXISTS messages_chat_ts ON messages (chat, ts);
@@ -124,9 +125,21 @@ CREATE TABLE IF NOT EXISTS meta (
 func migrate(db *sql.DB) {
 	for _, col := range []string{
 		`messages ADD COLUMN starred INTEGER NOT NULL DEFAULT 0`,
+		`messages ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0`,
 		`chats ADD COLUMN biz_name TEXT NOT NULL DEFAULT ''`,
 	} {
 		db.Exec(`ALTER TABLE ` + col)
+	}
+	db.Exec(`CREATE INDEX IF NOT EXISTS messages_expiry ON messages (expires_at) WHERE expires_at > 0 AND kind != 'expired'`)
+	// A reply prepared before its target expired must not restore a local
+	// snapshot after cleanup, including delayed outgoing file uploads.
+	for name, event := range map[string]string{"insert": "INSERT", "update": "UPDATE OF quote_id, quote_text, quote_thumb"} {
+		db.Exec(`CREATE TRIGGER IF NOT EXISTS expired_quote_` + name + ` AFTER ` + event + ` ON messages
+			WHEN NEW.quote_id != '' AND NEW.quote_kind != 'expired' AND EXISTS (
+				SELECT 1 FROM messages WHERE chat=NEW.chat AND id=NEW.quote_id AND NOT (` + liveMessage + `))
+			BEGIN
+				UPDATE messages SET quote_from='',quote_kind='expired',quote_text='',quote_thumb='' WHERE chat=NEW.chat AND id=NEW.id;
+			END`)
 	}
 	// Omawhats was whatsapp-claude, and its cache folder moved with the
 	// name: the pictures of link previews and quotes stored before point
@@ -313,10 +326,10 @@ func (b *Bridge) sendChats() {
 func (b *Bridge) chats() []Chat {
 	// Cleared ones stay, empty, as on the phone.
 	rows, err := b.db.Query(`SELECT c.jid, c.name, c.last_ts, c.unread, c.marked, c.pinned, c.archived, c.mute_until, c.read_only, c.favorite, c.verified, c.biz_name,
-		COALESCE(m.id, ''), COALESCE(m.kind, ''), COALESCE(m.text, ''), COALESCE(m.x, ''), COALESCE(m.from_me, 0), COALESCE(m.status, 0),
+		COALESCE(m.id, ''), COALESCE(m.expires_at, 0), COALESCE(m.kind, ''), COALESCE(m.text, ''), COALESCE(m.x, ''), COALESCE(m.from_me, 0), COALESCE(m.status, 0),
 		COALESCE(m.sender, ''), COALESCE(m.push_name, ''), COALESCE(md.seconds, 0), COALESCE(md.proto, X'')
 		FROM chats c
-		LEFT JOIN messages m ON m.rowid = (SELECT rowid FROM messages WHERE chat = c.jid ORDER BY ts DESC LIMIT 1)
+		LEFT JOIN messages m ON m.rowid = (SELECT rowid FROM messages WHERE chat = c.jid AND ` + liveMessage + ` ORDER BY ts DESC LIMIT 1)
 		LEFT JOIN media md ON md.chat = m.chat AND md.id = m.id
 		WHERE m.rowid IS NOT NULL OR c.cleared > 0`)
 	if err != nil {
@@ -339,10 +352,11 @@ func (b *Bridge) chats() []Chat {
 		var level, groupName, bizName, id, kind, text, x, sender, push string
 		var fromMe bool
 		var status int
+		var expires int64
 		var secs uint32
 		var blob []byte
 		if rows.Scan(&c.JID, &groupName, &c.TS, &c.Unread, &c.Marked, &c.Pin, &c.Archived, &c.Mute, &c.ReadOnly, &c.Favorite, &level, &bizName,
-			&id, &kind, &text, &x, &fromMe, &status, &sender, &push, &secs, &blob) != nil {
+			&id, &expires, &kind, &text, &x, &fromMe, &status, &sender, &push, &secs, &blob) != nil {
 			continue
 		}
 		jid, _ := types.ParseJID(c.JID)
@@ -374,7 +388,7 @@ func (b *Bridge) chats() []Chat {
 			c.Mute = 0
 		}
 		if id != "" {
-			l := &Last{ID: id, FromMe: fromMe, Status: status, Kind: kind, Seconds: secs}
+			l := &Last{ID: id, ExpiresAt: expires, FromMe: fromMe, Status: status, Kind: kind, Seconds: secs}
 			l.Text = withMentions(text, b.mentions(text, seen))
 			if len(l.Text) > 300 {
 				l.Text = cut(l.Text, 300)
@@ -430,7 +444,7 @@ func cut(s string, n int) string {
 // ---------------------------------------------------------------- messages
 
 const msgCols = `chat, id, sender, push_name, from_me, ts, messages.kind, text, x, edited, quote_id, quote_from, quote_kind, quote_text, quote_thumb,
-	status, card, forwarded, starred, COALESCE(media.kind, ''), COALESCE(mime, ''), COALESCE(seconds, 0), COALESCE(ptt, 0), proto`
+	status, card, forwarded, starred, expires_at, COALESCE(media.kind, ''), COALESCE(mime, ''), COALESCE(seconds, 0), COALESCE(ptt, 0), proto`
 
 func (b *Bridge) load(chat, id string) *Msg {
 	ms := b.query(`WHERE chat = ? AND id = ?`, chat, id)
@@ -441,7 +455,7 @@ func (b *Bridge) load(chat, id string) *Msg {
 }
 
 func (b *Bridge) query(where string, args ...any) []Msg {
-	rows, err := b.db.Query(`SELECT `+msgCols+` FROM messages LEFT JOIN media USING (chat, id) `+where, args...)
+	rows, err := b.db.Query(`SELECT `+msgCols+` FROM (SELECT * FROM messages WHERE `+liveMessage+`) AS messages LEFT JOIN media USING (chat, id) `+where, args...)
 	if err != nil {
 		logf("query: %v", err)
 		return nil
@@ -456,7 +470,7 @@ func (b *Bridge) query(where string, args ...any) []Msg {
 		var md Media
 		var blob []byte
 		if err := rows.Scan(&m.Chat, &m.ID, &m.Sender, &push, &m.FromMe, &m.TS, &m.Kind, &m.Text, &x, &m.Edited,
-			&qID, &qFrom, &qKind, &qText, &qThumb, &m.Status, &card, &m.Forwarded, &m.Starred,
+			&qID, &qFrom, &qKind, &qText, &qThumb, &m.Status, &card, &m.Forwarded, &m.Starred, &m.ExpiresAt,
 			&md.Kind, &md.Mime, &md.Seconds, &md.PTT, &blob); err != nil {
 			logf("scan: %v", err)
 			continue
@@ -465,7 +479,7 @@ func (b *Bridge) query(where string, args ...any) []Msg {
 			m.X = json.RawMessage(x)
 		}
 		if md.Kind != "" {
-			md.fill(m.Chat, m.ID, partOf(blob))
+			md.fill(b, m.Chat, m.ID, partOf(blob))
 			m.Media = &md
 		}
 		if card != "" {
@@ -480,7 +494,7 @@ func (b *Bridge) query(where string, args ...any) []Msg {
 			m.Name = b.senderName(j, push)
 			names[key] = m.Name
 		}
-		if qID != "" {
+		if qID != "" && !b.messageExpired(m.Chat, qID) {
 			q := &Quote{ID: qID, From: qFrom, Kind: qKind}
 			if n, ok := names[qFrom]; ok {
 				q.Name = n

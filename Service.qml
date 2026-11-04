@@ -85,18 +85,42 @@ Item {
     onLoaded: {
       try { root.settings = JSON.parse(text()) || {} } catch (e) { root.settings = {} }
       root.settingsLoaded = true
+      if (root.settings.drafts !== undefined) root.clearAccountDrafts("")
     }
     onLoadFailed: { root.settings = {}; root.settingsLoaded = true }
   }
   Timer { id: saveSettingsSoon; interval: 600; onTriggered: settingsFile.setText(JSON.stringify(root.settings, null, 2)) }
 
-  // Drafts per chat, kept across restarts.
-  function draft(chat) { var d = root.setting("drafts", {}); return d[chat] || "" }
-  function setDraft(chat, text) {
-    var d = U.copy(root.setting("drafts", {}))
-    if (text) d[chat] = text
-    else delete d[chat]
-    root.setSetting("drafts", d)
+  // A chat JID alone is not a draft owner: the linked account is part of the key.
+  readonly property string draftAccount: store.linked && store.me ? (store.me.jid || "") : ""
+  property int draftEpoch: 0
+  onDraftAccountChanged: root.draftEpoch++
+  function draft(chat) {
+    if (!root.draftAccount) return ""
+    var accounts = root.setting("accountDrafts", {})
+    return (accounts[root.draftAccount] || {})[chat] || ""
+  }
+  function setDraft(chat, text, account, epoch) {
+    if (account === undefined) { account = root.draftAccount; epoch = root.draftEpoch }
+    if (!account || account !== root.draftAccount || epoch !== root.draftEpoch || !chat) return
+    var accounts = U.copy(root.setting("accountDrafts", {}))
+    var drafts = U.copy(accounts[account] || {})
+    if (text) drafts[chat] = text
+    else delete drafts[chat]
+    accounts[account] = drafts
+    root.setSetting("accountDrafts", accounts)
+  }
+  function clearAccountDrafts(account) {
+    root.draftEpoch++
+    var s = U.copy(root.settings)
+    var accounts = U.copy(s.accountDrafts || {})
+    if (account) delete accounts[account]
+    s.accountDrafts = accounts
+    // Legacy drafts have no verifiable owner and cannot be migrated safely.
+    delete s.drafts
+    root.settings = s
+    saveSettingsSoon.stop()
+    if (root.settingsLoaded) settingsFile.setText(JSON.stringify(s, null, 2))
   }
 
   // ---------------------------------------------------------------- whatsapp

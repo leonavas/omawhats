@@ -94,9 +94,10 @@ func (b *Bridge) send(c Cmd) {
 		}
 		out = &waE2E.Message{ExtendedTextMessage: ext}
 	}
+	expires := b.outgoingDeadline(c.Chat, out, now)
 	qID, qFrom, qKind, qText, qThumb := q.cols()
-	b.db.Exec(`INSERT INTO messages (chat, id, sender, from_me, ts, kind, text, quote_id, quote_from, quote_kind, quote_text, quote_thumb, status)
-		VALUES (?, ?, ?, 1, ?, 'text', ?, ?, ?, ?, ?, ?, 0)`, c.Chat, id, me.String(), now, text, qID, qFrom, qKind, qText, qThumb)
+	b.db.Exec(`INSERT INTO messages (chat, id, sender, from_me, ts, kind, text, quote_id, quote_from, quote_kind, quote_text, quote_thumb, status, expires_at)
+		VALUES (?, ?, ?, 1, ?, 'text', ?, ?, ?, ?, ?, ?, 0, ?)`, c.Chat, id, me.String(), now, text, qID, qFrom, qKind, qText, qThumb, expires)
 	b.db.Exec(`INSERT INTO chats (jid, last_ts) VALUES (?, ?) ON CONFLICT (jid) DO UPDATE SET last_ts = excluded.last_ts, cleared = 0, archived = 0`, c.Chat, now)
 	b.emitMsg(c.Chat, id)
 	b.flush()

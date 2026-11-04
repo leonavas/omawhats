@@ -499,7 +499,9 @@ Item {
     Column {
       id: place
       readonly property var loc: b.x_.loc || {}
-      readonly property bool hasCoords: isFinite(loc.lat) && isFinite(loc.lon) && (loc.lat !== 0 || loc.lon !== 0)
+      readonly property bool hasCoords: typeof loc.lat === "number" && typeof loc.lon === "number"
+                                        && isFinite(loc.lat) && isFinite(loc.lon)
+                                        && Math.abs(loc.lat) <= 90 && Math.abs(loc.lon) <= 180
       readonly property string url: loc.url || (hasCoords ? "https://maps.google.com/maps?q=" + loc.lat + "," + loc.lon + "&z=17&hl=" + (b.app.lang === "en" ? "en" : "pt-BR") : "")
       property real natural: Math.min(b.innerMax, b.t.sp(270))
       spacing: b.t.sp(4)
@@ -510,86 +512,28 @@ Item {
         radius: b.t.sp(6)
         color: b.t.alpha(b.t.fg, 0.08)
 
-        // The map drawn from Esri's tiles (no key needed; CARTO's want one
-        // and OpenStreetMap's block Qt), the place in the middle, as
-        // WhatsApp Web's picture of it; the phone's own thumbnail (100 px,
-        // blurry when stretched) only when the tiles can't be had.
-        readonly property int zoom: 16
-        readonly property real ts: b.t.sp(256)
-        readonly property real px: (place.loc.lon + 180) / 360 * Math.pow(2, zoom) * ts
-        readonly property real py: {
-          var r = place.loc.lat * Math.PI / 180
-          return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, zoom) * ts
-        }
-        readonly property real ox: px - width / 2
-        readonly property real oy: py - height / 2
-        readonly property var tiles: {
-          if (!place.hasCoords || width <= 0) return []
-          var out = [], n = Math.pow(2, zoom)
-          for (var ty = Math.floor(oy / ts); ty <= Math.floor((oy + height) / ts); ty++)
-            for (var tx = Math.floor(ox / ts); tx <= Math.floor((ox + width) / ts); tx++)
-              if (ty >= 0 && ty < n) out.push({ x: tx, y: ty })
-          return out
-        }
-        property int failed: 0
-        readonly property string esri: "https://server.arcgisonline.com/ArcGIS/rest/services/"
-        readonly property string base: b.t.dark ? "Canvas/World_Dark_Gray_Base" : "World_Street_Map"
-        readonly property string labels: b.t.dark ? "Canvas/World_Dark_Gray_Reference" : ""
-
+        // Only the thumbnail delivered with the message; no background map requests.
         Image {
-          visible: !place.hasCoords || mapBox.failed > 0
+          id: locationThumb
           anchors.fill: parent
-          source: visible && b.x_.thumb ? U.fileUrl(b.x_.thumb) : ""
+          source: b.x_.thumb ? U.fileUrl(b.x_.thumb) : ""
           fillMode: Image.PreserveAspectCrop
           asynchronous: true
           smooth: true
-        }
-        Repeater {
-          model: mapBox.failed > 0 ? [] : mapBox.tiles
-          Item {
-            required property var modelData
-            readonly property int n: Math.pow(2, mapBox.zoom)
-            readonly property string tile: "/MapServer/tile/" + mapBox.zoom + "/" + modelData.y + "/" + (((modelData.x % n) + n) % n)
-            x: modelData.x * mapBox.ts - mapBox.ox
-            y: modelData.y * mapBox.ts - mapBox.oy
-            width: mapBox.ts
-            height: mapBox.ts
-            Image {
-              anchors.fill: parent
-              asynchronous: true
-              smooth: true
-              source: mapBox.esri + mapBox.base + parent.tile
-              onStatusChanged: if (status === Image.Error) mapBox.failed++
-            }
-            Image {
-              anchors.fill: parent
-              asynchronous: true
-              smooth: true
-              source: mapBox.labels ? mapBox.esri + mapBox.labels + parent.tile : ""
-            }
-          }
-        }
-        // The pin, its tip on the place.
-        Image {
-          visible: place.hasCoords && mapBox.failed === 0
-          width: b.t.sp(24)
-          height: b.t.sp(38)
-          x: (parent.width - width) / 2
-          y: parent.height / 2 - height
-          sourceSize.width: 54
-          sourceSize.height: 86
-          smooth: true
-          source: "data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='-1 -1 29 45'><path fill='#EA4335' stroke='#B31412' stroke-width='1' d='M13.5 0C6.04 0 0 6.04 0 13.5 0 23.6 13.5 43 13.5 43S27 23.6 27 13.5C27 6.04 20.96 0 13.5 0z'/><circle cx='13.5' cy='13.5' r='4.6' fill='#B31412'/></svg>")
+          sourceSize.width: 540
+          sourceSize.height: 300
         }
         Text {
-          visible: place.hasCoords && mapBox.failed === 0
-          anchors.left: parent.left
-          anchors.bottom: parent.bottom
-          anchors.margins: b.t.sp(4)
-          text: "Esri"
-          color: b.t.dark ? Qt.rgba(1, 1, 1, 0.45) : Qt.rgba(0, 0, 0, 0.45)
+          anchors.centerIn: parent
+          width: parent.width - b.t.sp(24)
+          visible: locationThumb.status !== Image.Ready
+          text: place.url ? b.app.tr("Open map", "Abrir mapa") : b.app.tr("Location unavailable", "Localização indisponível")
+          textFormat: Text.PlainText
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.Wrap
+          color: b.t.dim
           font.family: b.t.font
-          font.pixelSize: b.t.sp(8)
+          font.pixelSize: b.t.fsSmall
         }
         MouseArea {
           anchors.fill: parent

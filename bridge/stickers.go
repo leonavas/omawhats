@@ -88,7 +88,7 @@ func (b *Bridge) stickersOnce() {
 // isn't one or its keys weren't kept.
 func (b *Bridge) stickerOf(chat, id string) *waE2E.StickerMessage {
 	var blob []byte
-	b.db.QueryRow(`SELECT proto FROM media WHERE chat = ? AND id = ? AND kind = 'sticker'`, chat, id).Scan(&blob)
+	b.db.QueryRow(`SELECT proto FROM media JOIN messages USING(chat,id) WHERE chat = ? AND id = ? AND media.kind = 'sticker' AND `+liveMessage, chat, id).Scan(&blob)
 	x := partOf(blob).GetStickerMessage()
 	if len(x.GetFileSHA256()) == 0 || len(x.GetMediaKey()) == 0 {
 		return nil
@@ -235,7 +235,7 @@ func (b *Bridge) stickerList() {
 			}
 		}
 	}
-	if rows, err := b.db.Query(`SELECT m.chat, m.id, md.proto FROM messages m JOIN media md USING (chat, id)
+	if rows, err := b.db.Query(`SELECT m.chat, m.id, md.proto FROM (SELECT * FROM messages WHERE expires_at = 0 AND ` + liveMessage + `) m JOIN media md USING (chat, id)
 		WHERE md.kind = 'sticker' ORDER BY m.ts DESC LIMIT 120`); err == nil {
 		type recent struct {
 			chat, id string
@@ -307,13 +307,14 @@ func (b *Bridge) sendSticker(c Cmd) {
 	id := b.cli.GenerateMessageID()
 	me := b.me().String()
 	now := time.Now().Unix()
+	expires := b.outgoingDeadline(c.Chat, msg, now)
 	qID, qFrom, qKind, qText, qThumb := q.cols()
-	b.db.Exec(`INSERT INTO messages (chat, id, sender, from_me, ts, kind, quote_id, quote_from, quote_kind, quote_text, quote_thumb, status)
-		VALUES (?, ?, ?, 1, ?, 'sticker', ?, ?, ?, ?, ?, 0)`, c.Chat, id, me, now, qID, qFrom, qKind, qText, qThumb)
+	b.db.Exec(`INSERT INTO messages (chat, id, sender, from_me, ts, kind, quote_id, quote_from, quote_kind, quote_text, quote_thumb, status, expires_at)
+		VALUES (?, ?, ?, 1, ?, 'sticker', ?, ?, ?, ?, ?, 0, ?)`, c.Chat, id, me, now, qID, qFrom, qKind, qText, qThumb, expires)
 	md, part := mediaOf(msg)
 	b.storeMedia(c.Chat, id, md, part, jid.String(), me)
 	if p := stickerFile(x.GetFileSHA256()); fileExists(p) {
-		linkOrCopy(p, mediaFile(c.Chat, id, "image/webp"))
+		b.cacheCopy(c.Chat, id, p, mediaFile(c.Chat, id, "image/webp"))
 	}
 	b.db.Exec(`INSERT INTO chats (jid, last_ts) VALUES (?, ?) ON CONFLICT (jid) DO UPDATE SET last_ts = excluded.last_ts, cleared = 0, archived = 0`, c.Chat, now)
 	b.emitMsg(c.Chat, id)

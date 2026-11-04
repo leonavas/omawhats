@@ -88,7 +88,7 @@ off in Settings.
 
 All of them only yours (folders `0700`, files `0600`):
 
-- `~/.config/omawhats/settings.json`: settings and drafts.
+- `~/.config/omawhats/settings.json`: settings and drafts, separated by linked account.
 - `~/.local/share/omawhats/`: the session, the message store, avatars,
   the built bridge and its log.
 - `~/.cache/omawhats/`: downloaded media, and Go's module and build caches
@@ -98,6 +98,19 @@ All of them only yours (folders `0700`, files `0600`):
 
 Log out from Settings (or unlink the device on your phone) to end the
 session. Your messages only travel between your machine and WhatsApp.
+Location previews use the thumbnail included in the message, without requesting
+map tiles from a third party. Clicking a location opens its link in your browser.
+
+Messages with an expiration deadline are hidden when it passes; the bridge
+removes their local content, media keys and cached files while running and on
+startup. Older media timers are recovered where the original metadata remains.
+Older text messages whose timer was never stored cannot be expired retroactively
+without a fresh history sync containing that metadata. Copies you explicitly
+save, forward or favorite are separate from this cleanup; it is not a guarantee
+of forensic erasure or removal from backups.
+
+Logging out clears that account's drafts. On upgrade, legacy drafts without an
+account identifier are discarded because their owner cannot be established.
 
 ## Remove
 

@@ -208,6 +208,7 @@ Item {
   }
 
   function upsert(m) {
+    if (!wa.available(m)) return
     var h = wa.histories[m.chat]
     if (!h || !h.loaded) return
     var i = wa._indexOf(h.msgs, m.id)
@@ -340,7 +341,7 @@ Item {
   property var downloads: ({})
   property int downloadsRev: 0
   function download(m, auto) {
-    if (!m || !m.media) return
+    if (!wa.available(m) || !m.media) return
     var key = m.chat + "|" + m.id
     if (wa.downloads[key] === "busy") return
     wa.downloads[key] = "busy"
@@ -351,7 +352,7 @@ Item {
   // Something to do with the file once it's here (open it, save it, play it).
   property var _onDownloaded: ({})
   function whenDownloaded(m, cb) {
-    if (!m || !m.media) return
+    if (!wa.available(m) || !m.media) return
     if (m.media.file) { cb(m.media.file); return }
     wa._onDownloaded[m.chat + "|" + m.id] = cb
     wa.download(m, false)
@@ -361,7 +362,7 @@ Item {
   property var player: null
   property real speed: 1
   function play(m) {
-    if (!m || !m.media) return
+    if (!wa.available(m) || !m.media) return
     if (!m.media.file) { wa.pendingPlay = m.chat + "|" + m.id; wa.download(m, false); return }
     var p = wa.player
     if (p && p.chat === m.chat && p.id === m.id) {
@@ -404,13 +405,113 @@ Item {
   signal receipted(string chat, var ids)
   signal failed(string text)
 
+  property var removedMessages: ({})
+  function available(m) {
+    return !!m && !wa.removedMessages[m.chat + "|" + m.id]
+           && (!(m.expires_at > 0) || m.expires_at > Date.now() / 1000)
+  }
+  Timer {
+    interval: 1000
+    running: true
+    repeat: true
+    onTriggered: {
+      var due = {}
+      function inspect(m) {
+        if (!m || !(m.expires_at > 0) || m.expires_at > Date.now() / 1000) return
+        var ids = due[m.chat] || []
+        if (ids.indexOf(m.id) < 0) ids.push(m.id)
+        due[m.chat] = ids
+      }
+      for (var chat in wa.histories) wa.histories[chat].msgs.forEach(inspect)
+      var results = [wa.search, wa.chatSearch, wa.mediaList]
+      results.forEach(function(result) { if (result) (result.msgs || result.messages || []).forEach(inspect) })
+      if (wa.starred) wa.starred.forEach(inspect)
+      for (var jid in wa.chatMap) {
+        var c = wa.chatMap[jid]
+        if (c.last && c.last.expires_at > 0 && c.last.expires_at <= Date.now() / 1000) {
+          inspect(Object.assign({}, c.last, { chat: jid }))
+          c.last = null; wa.chatsRev++
+        }
+      }
+      for (var key in due) wa.removeMessages(key, due[key])
+    }
+  }
+
+  signal messagesRemoved(string chat, var ids)
+  signal accountReset()
+
+  function resetAccount() {
+    if (wa.app) {
+      wa.app.clearAccountDrafts(wa.me ? wa.me.jid : "")
+      wa.app.video = null
+      wa.app.videoResume = null
+    }
+    wa.me = null
+    wa.current = ""
+    wa.chatMap = ({})
+    wa.histories = ({})
+    wa.removedMessages = ({})
+    wa.avatars = ({})
+    wa._avatarAsked = ({})
+    wa._avatarQueue = []
+    wa.profiles = ({})
+    wa.presence = ({})
+    wa.typing = ({})
+    wa.downloads = ({})
+    wa._onDownloaded = ({})
+    wa.unreadMarks = ({})
+    wa.pendingPlay = ""
+    wa.stopPlayer()
+    wa.search = null
+    wa.chatSearch = null
+    wa.mediaList = null
+    wa.msgInfo = null
+    wa.starred = null
+    wa.contacts = null
+    wa.stickers = null
+    wa.chatSubs = ({})
+    wa.stickerFavs = ({})
+    wa.chatsRev++; wa.historyRev++; wa.avatarsRev++; wa.profilesRev++
+    wa.typingRev++; wa.presenceRev++; wa.downloadsRev++; wa.marksRev++
+    wa.accountReset()
+  }
+
+  function removeMessages(chat, ids) {
+    ids.forEach(function(id) { wa.removedMessages[chat + "|" + id] = true })
+    function keep(m) { return m.chat !== chat || ids.indexOf(m.id) < 0 }
+    var h = wa.histories[chat]
+    if (h) {
+      h.msgs = h.msgs.filter(keep).map(function(m) {
+        if (!m.quote || ids.indexOf(m.quote.id) < 0) return m
+        var copy = U.copy(m); copy.quote = null; return copy
+      })
+      wa.historyRev++
+    }
+    // Results and download closures can outlive their history page.
+    wa.search = null; wa.chatSearch = null; wa.mediaList = null; wa.starred = null
+    wa.msgInfo = null; wa.stickers = null
+    ids.forEach(function(id) {
+      delete wa.downloads[chat + "|" + id]
+      delete wa._onDownloaded[chat + "|" + id]
+    })
+    wa.downloadsRev++
+    if (wa.player && wa.player.chat === chat && ids.indexOf(wa.player.id) >= 0) wa.stopPlayer()
+    if (ids.some(function(id) { return wa.pendingPlay === chat + "|" + id })) wa.pendingPlay = ""
+    if (wa.app.video && wa.app.video.m && wa.app.video.m.chat === chat && ids.indexOf(wa.app.video.m.id) >= 0) wa.app.video = null
+    wa.app.videoResume = null
+    wa.messagesRemoved(chat, ids)
+  }
+
   function handle(ev) {
+    if (ev.msgs) ev.msgs = ev.msgs.filter(function(m) { return wa.available(m) })
+    if (ev.messages) ev.messages = ev.messages.filter(function(m) { return wa.available(m) })
+    if (ev.chat && ev.id && wa.removedMessages[ev.chat + "|" + ev.id]) return
     switch (ev.t) {
     case "state":
+      if (ev.me && wa.me && ev.me.jid !== wa.me.jid) wa.resetAccount()
       if (ev.me) wa.me = ev.me
       if (ev.state === "paired") { wa.qr = null; wa.pairCode = ""; wa.conn = "connecting"; break }
-      if (ev.state === "pairing") { wa.me = null; wa.chatMap = ({}); wa.chatsRev++ }
-      if (ev.state === "logged_out") { wa.me = null; wa.chatMap = ({}); wa.histories = ({}); wa.chatsRev++; wa.historyRev++; wa.current = "" }
+      if (ev.state === "pairing" || ev.state === "logged_out") wa.resetAccount()
       if (ev.state === "qr_timeout") break
       wa.conn = ev.state
       if (ev.state === "ready") {
@@ -461,7 +562,7 @@ Item {
     }
     case "message": {
       var m = ev.msg
-      if (!m) break
+      if (!wa.available(m)) break
       wa.upsert(m)
       if (wa.pendingPlay === m.chat + "|" + m.id && m.media && m.media.file) { wa.pendingPlay = ""; wa.play(m) }
       if (ev["new"]) {
@@ -516,14 +617,9 @@ Item {
       }
       break
     }
-    case "removed": {
-      var hd = wa.histories[ev.chat]
-      if (!hd) break
-      var ids = ev.ids || []
-      hd.msgs = hd.msgs.filter(function(x) { return ids.indexOf(x.id) < 0 })
-      wa.historyRev++
+    case "removed":
+      wa.removeMessages(ev.chat, ev.ids || [])
       break
-    }
     case "cleared":
       if (wa.histories[ev.chat]) { wa.histories[ev.chat].msgs = []; wa.historyRev++ }
       break

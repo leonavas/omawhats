@@ -40,7 +40,16 @@ Item {
   property bool _loading: false
   onChatChanged: box.loadDraft()
   Component.onCompleted: box.loadDraft()
+  Connections {
+    target: box.app
+    function onDraftEpochChanged() { draftSave.stop(); pausedSoon.stop(); box.loadDraft() }
+    function onSettingsLoadedChanged() { box.loadDraft() }
+  }
   function loadDraft() {
+    if (draftSave.running) {
+      box.app.setDraft(draftSave.chat, draftSave.text, draftSave.account, draftSave.epoch)
+      draftSave.stop()
+    }
     box._loading = true
     input.text = box.app.draft(box.chat)
     input.cursorPosition = input.length
@@ -50,13 +59,15 @@ Item {
     box.emojiDismissed = -1
     panel.visible = false
   }
-  Timer { id: draftSave; interval: 700; property string chat: ""; property string text: ""; onTriggered: box.app.setDraft(chat, text) }
+  Timer { id: draftSave; interval: 700; property string chat: ""; property string text: ""; property string account: ""; property int epoch: 0; onTriggered: box.app.setDraft(chat, text, account, epoch) }
 
   // ------------------------------------------------------------ typing
   property real _lastTyping: 0
   Timer { id: pausedSoon; interval: 4000; onTriggered: box.wa.typingState(box.chat, "paused") }
   function typed() {
     if (box._loading) return
+    draftSave.account = box.app.draftAccount
+    draftSave.epoch = box.app.draftEpoch
     draftSave.chat = box.chat
     draftSave.text = input.text
     draftSave.restart()

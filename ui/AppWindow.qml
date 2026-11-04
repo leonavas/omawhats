@@ -34,6 +34,20 @@ FloatingWindow {
   // Your menu (the photo at the foot of the rail, Alt+S), whatsapp-tui's.
   property bool accountOpen: false
   readonly property bool menusShown: menus.shown
+  Connections {
+    target: appWin.wa
+    function onAccountReset() {
+      menus.close()
+      appWin.infoMsg = null; appWin.infoOpen = false; appWin.infoChat = ""
+      appWin.searchChat = ""; appWin.accountOpen = false; appWin.sideView = "chats"
+    }
+    function onMessagesRemoved(chat, ids) {
+      menus.close()
+      if (appWin.infoMsg && appWin.infoMsg.chat === chat && ids.indexOf(appWin.infoMsg.id) >= 0) {
+        appWin.infoMsg = null; appWin.infoOpen = false
+      }
+    }
+  }
 
   // While a launch maps it, the one-time title its window rule looks for
   // (Service.launchWindow).

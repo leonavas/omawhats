@@ -17,6 +17,20 @@ Rectangle {
   readonly property var t: app.theme
   readonly property var wa: app.wa
   signal closed()
+  Connections {
+    target: mv.wa
+    function onMessagesRemoved(chat, ids) {
+      if ((mv.current && mv.current.chat === chat && ids.indexOf(mv.current.id) >= 0)
+          || (mv.msg && mv.msg.chat === chat && ids.indexOf(mv.msg.id) >= 0)) mv.closed()
+    }
+    function onAccountReset() { mv.closed() }
+  }
+  Timer {
+    interval: 1000
+    running: !!mv.current && mv.current.expires_at > 0
+    repeat: true
+    onTriggered: if (!mv.wa.available(mv.current)) mv.closed()
+  }
 
   color: t.alpha(t.dark ? t.bgDarker : t.bg, 0.97)
   focus: true

@@ -37,7 +37,7 @@ func (b *Bridge) fwdContent(chat, id string) *fwdMsg {
 	var score, ts int64
 	var blob []byte
 	if b.db.QueryRow(`SELECT text, card, forwarded, ts, messages.kind, COALESCE(media.kind, ''), COALESCE(mime, ''), proto
-		FROM messages LEFT JOIN media USING (chat, id) WHERE chat = ? AND id = ?`, chat, id).
+		FROM messages LEFT JOIN media USING (chat, id) WHERE chat = ? AND id = ? AND `+liveMessage, chat, id).
 		Scan(&text, &card, &score, &ts, &kind, &mkind, &mime, &blob) != nil {
 		return nil
 	}
@@ -120,9 +120,10 @@ func (b *Bridge) forward(chat string, ids, to []string) {
 		for _, f := range msgs {
 			id := b.cli.GenerateMessageID()
 			msg := f.build()
+			expires := b.outgoingDeadline(t, msg, now)
 			c, _ := contentOf(msg)
-			b.db.Exec(`INSERT INTO messages (chat, id, sender, from_me, ts, kind, text, status, forwarded) VALUES (?, ?, ?, 1, ?, ?, ?, 0, ?)`,
-				t, id, me, now, c.Kind, c.Text, f.score+1)
+			b.db.Exec(`INSERT INTO messages (chat, id, sender, from_me, ts, kind, text, status, forwarded, expires_at) VALUES (?, ?, ?, 1, ?, ?, ?, 0, ?, ?)`,
+				t, id, me, now, c.Kind, c.Text, f.score+1, expires)
 			if md, part := mediaOf(msg); md != nil {
 				b.storeMedia(t, id, md, part, jid.String(), me)
 				// The file already here plays in the new bubble without a download.
@@ -130,7 +131,7 @@ func (b *Bridge) forward(chat string, ids, to []string) {
 					{thumbFile(chat, f.id, "frame"), thumbFile(t, id, "frame")}, {thumbFile(chat, f.id, "thumb"), thumbFile(t, id, "thumb")}}
 				for _, p := range pairs {
 					if _, err := os.Stat(p[0]); err == nil {
-						linkOrCopy(p[0], p[1])
+						b.cacheCopy(t, id, p[0], p[1])
 					}
 				}
 			}

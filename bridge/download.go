@@ -11,6 +11,7 @@ import (
 	"errors"
 	"io"
 	"mime"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -105,7 +106,12 @@ func thumbFile(chat, id, what string) string {
 // fill completes what a media's bubble shows from the part its message
 // carries: sizes, a document's name and pages, a voice note's waveform,
 // and the thumbnail, written to disk once.
-func (md *Media) fill(chat, id string, part *waE2E.Message) {
+func (md *Media) fill(b *Bridge, chat, id string, part *waE2E.Message) {
+	b.mediaMu.Lock()
+	defer b.mediaMu.Unlock()
+	if !b.messageLive(chat, id) {
+		return
+	}
 	path := mediaFile(chat, id, md.Mime)
 	thumbPath, framePath := thumbFile(chat, id, "thumb"), thumbFile(chat, id, "frame")
 	touch(path, thumbPath, framePath)
@@ -129,7 +135,7 @@ func (md *Media) fill(chat, id string, part *waE2E.Message) {
 		}
 		// Here without a download (one you sent): its frame all the same.
 		if md.File != "" {
-			go poster(chat, id, md.File)
+			go b.poster(chat, id, md.File)
 		}
 	case part.GetAudioMessage() != nil:
 		x := part.GetAudioMessage()
@@ -167,7 +173,10 @@ func (md *Media) fill(chat, id string, part *waE2E.Message) {
 // Once at a time for each.
 var posting sync.Map
 
-func poster(chat, id, path string) {
+func (b *Bridge) poster(chat, id, path string) {
+	if !b.messageLive(chat, id) {
+		return
+	}
 	out := thumbFile(chat, id, "frame")
 	if _, err := os.Stat(out); err == nil {
 		return
@@ -177,9 +186,13 @@ func poster(chat, id, path string) {
 	}
 	defer posting.Delete(out)
 	tmp := out + ".tmp"
-	err := exec.Command("ffmpeg", "-v", "error", "-y", "-i", path, "-vf", "thumbnail=30,scale='min(720,iw)':-2",
+	ctx, cancel := context.WithTimeout(b.ctx, 30*time.Second)
+	defer cancel()
+	err := exec.CommandContext(ctx, "ffmpeg", "-v", "error", "-y", "-i", path, "-vf", "thumbnail=30,scale='min(720,iw)':-2",
 		"-frames:v", "1", "-f", "mjpeg", tmp).Run()
-	if err != nil || os.Rename(tmp, out) != nil {
+	b.mediaMu.Lock()
+	defer b.mediaMu.Unlock()
+	if !b.messageLive(chat, id) || err != nil || os.Rename(tmp, out) != nil {
 		os.Remove(tmp)
 		return
 	}
@@ -224,11 +237,14 @@ func setDirectPath(m *waE2E.Message, p string) {
 // storeMedia keeps what a message's media is; a nil part keeps the keys
 // stored before (a pending message rewritten).
 func (b *Bridge) storeMedia(chat, id string, md *Media, part *waE2E.Message, waChat, waSender string) {
+	b.mediaMu.Lock()
+	defer b.mediaMu.Unlock()
 	if md == nil {
 		return
 	}
 	var blob []byte
 	if part != nil {
+		b.stripExpiredQuote(chat, contextOf(part))
 		blob, _ = proto.Marshal(part)
 	}
 	defer func() {
@@ -241,11 +257,11 @@ func (b *Bridge) storeMedia(chat, id string, md *Media, part *waE2E.Message, waC
 			}()
 		}
 	}()
-	_, err := b.db.Exec(`INSERT INTO media (chat, id, kind, mime, seconds, ptt, proto, wa_chat, wa_sender) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	_, err := b.db.Exec(`INSERT INTO media (chat, id, kind, mime, seconds, ptt, proto, wa_chat, wa_sender) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM messages WHERE chat = ? AND id = ? AND `+liveMessage+`)
 		ON CONFLICT (chat, id) DO UPDATE SET kind = excluded.kind, mime = excluded.mime,
 			seconds = max(seconds, excluded.seconds), ptt = excluded.ptt, proto = COALESCE(excluded.proto, proto),
 			wa_chat = excluded.wa_chat, wa_sender = excluded.wa_sender`,
-		chat, id, md.Kind, md.Mime, md.Seconds, md.PTT, blob, waChat, waSender)
+		chat, id, md.Kind, md.Mime, md.Seconds, md.PTT, blob, waChat, waSender, chat, id)
 	if err != nil {
 		logf("store media %s: %v", id, err)
 	}
@@ -522,7 +538,7 @@ func (b *Bridge) download(chat, id string, auto bool) {
 	var fromMe bool
 	var ts int64
 	err := b.db.QueryRow(`SELECT COALESCE(mime, ''), COALESCE(media.kind, ''), proto, COALESCE(media.wa_chat, ''), COALESCE(media.wa_sender, ''), sender, from_me, ts
-		FROM messages LEFT JOIN media USING (chat, id) WHERE chat = ? AND id = ?`, chat, id).
+		FROM messages LEFT JOIN media USING (chat, id) WHERE chat = ? AND id = ? AND `+liveMessage, chat, id).
 		Scan(&mimeType, &kind, &blob, &waChat, &waSender, &sender, &fromMe, &ts)
 	if err != nil {
 		if !auto {
@@ -538,9 +554,12 @@ func (b *Bridge) download(chat, id string, auto bool) {
 	}
 	path := mediaFile(chat, id, mimeType)
 	done := func() {
+		if !b.messageLive(chat, id) {
+			return
+		}
 		mediaDone(chat, id, path)
 		if kind == "video" || kind == "ptv" {
-			poster(chat, id, path)
+			b.poster(chat, id, path)
 		}
 	}
 	if st, err := os.Stat(path); mimeType != "" && err == nil && st.Size() > 0 {
@@ -558,7 +577,7 @@ func (b *Bridge) download(chat, id string, auto bool) {
 		}
 		return
 	}
-	err = b.fetch(part, path)
+	err = b.fetch(chat, id, part, path)
 	switch {
 	case err == nil:
 		done()
@@ -577,21 +596,41 @@ func (b *Bridge) download(chat, id string, auto bool) {
 	}
 }
 
-func (b *Bridge) fetch(part *waE2E.Message, path string) error {
+func (b *Bridge) fetch(chat, id string, part *waE2E.Message, path string) error {
+	if !b.messageLive(chat, id) {
+		return errors.New("message unavailable")
+	}
 	ctx, cancel := context.WithTimeout(b.ctx, 2*time.Minute)
 	defer cancel()
 	dl := downloadable(part)
+	if dl == nil {
+		return errors.New("missing media")
+	}
 	var data []byte
 	var err error
 	// WhatsApp's own announcements (the official account) carry no path,
 	// only a public static URL, still encrypted with the message's key.
 	if st, ok := dl.(interface{ GetStaticURL() string }); ok && dl.GetDirectPath() == "" && st.GetStaticURL() != "" {
+		var sender string
+		var fromMe bool
+		u, parseErr := url.Parse(st.GetStaticURL())
+		if parseErr != nil || !officialMediaURL(u) || chat != types.PSAJID.String() ||
+			b.db.QueryRow(`SELECT sender,from_me FROM messages WHERE chat=? AND id=? AND `+liveMessage, chat, id).Scan(&sender, &fromMe) != nil ||
+			fromMe || !b.sameSender(sender, types.PSAJID) {
+			return errors.New("untrusted static media source")
+		}
+		ctx = context.WithValue(ctx, officialMediaRequest{}, true)
 		data, err = b.cli.DangerousInternals().DownloadAndDecrypt(ctx, st.GetStaticURL(), dl.GetMediaKey(), whatsmeow.GetMediaType(dl), dl.GetFileEncSHA256(), dl.GetFileSHA256())
 	} else {
 		data, err = b.cli.Download(ctx, dl)
 	}
 	if err != nil {
 		return err
+	}
+	b.mediaMu.Lock()
+	defer b.mediaMu.Unlock()
+	if !b.messageLive(chat, id) {
+		return errors.New("message expired during download")
 	}
 	// A document is kept as sent: the shell never draws it.
 	if part.GetDocumentMessage() != nil {
@@ -601,6 +640,9 @@ func (b *Bridge) fetch(part *waE2E.Message, path string) error {
 }
 
 func (b *Bridge) askReupload(chat, id, path string, part *waE2E.Message, waChat, waSender string, fromMe bool) error {
+	if !b.messageLive(chat, id) {
+		return errors.New("message unavailable")
+	}
 	c, err := types.ParseJID(waChat)
 	if err != nil {
 		return err
@@ -638,7 +680,7 @@ func takeReupload(id types.MessageID) (reupload, bool) {
 // mediaRetry is the phone's answer: the media's new path, or that it's gone.
 func (b *Bridge) mediaRetry(e *events.MediaRetry) {
 	r, ok := takeReupload(e.MessageID)
-	if !ok {
+	if !ok || !b.messageLive(r.chat, r.id) {
 		return
 	}
 	n, err := whatsmeow.DecryptMediaRetryNotification(e, downloadable(r.part).GetMediaKey())
@@ -651,14 +693,14 @@ func (b *Bridge) mediaRetry(e *events.MediaRetry) {
 	if blob, err := proto.Marshal(r.part); err == nil {
 		b.db.Exec(`UPDATE media SET proto = ? WHERE chat = ? AND id = ?`, blob, r.chat, r.id)
 	}
-	if err := b.fetch(r.part, r.path); err != nil {
+	if err := b.fetch(r.chat, r.id, r.part, r.path); err != nil {
 		logf("download %s after retry: %v", r.id, err)
 		mediaFailed(r.chat, r.id, unavailable)
 		return
 	}
 	mediaDone(r.chat, r.id, r.path)
 	if r.part.GetVideoMessage() != nil || r.part.GetPtvMessage() != nil {
-		poster(r.chat, r.id, r.path)
+		b.poster(r.chat, r.id, r.path)
 	}
 }
 
@@ -723,4 +765,13 @@ func (b *Bridge) recoverMedia(chat, id, sender string, ts int64) {
 		_, err = b.cli.SendPeerMessage(b.ctx, b.cli.BuildHistorySyncRequest(&a, 10))
 		logf("recover %s: asked for 10 messages before %s (ts %d, from me %v, real %v): err=%v", c, a.ID, a.Timestamp.Unix(), a.IsFromMe, aID != "", err)
 	}
+}
+
+func (b *Bridge) cacheCopy(chat, id, from, to string) error {
+	b.mediaMu.Lock()
+	defer b.mediaMu.Unlock()
+	if !b.messageLive(chat, id) {
+		return errors.New("message unavailable")
+	}
+	return linkOrCopy(from, to)
 }

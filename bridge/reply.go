@@ -26,7 +26,7 @@ func (b *Bridge) quoting(chat, id string) *quoting {
 	var kind, text, sender, waSender string
 	var blob []byte
 	err := b.db.QueryRow(`SELECT messages.kind, text, sender, messages.wa_sender, proto FROM messages LEFT JOIN media USING (chat, id)
-		WHERE chat = ? AND id = ?`, chat, id).Scan(&kind, &text, &sender, &waSender, &blob)
+		WHERE chat = ? AND id = ? AND `+liveMessage, chat, id).Scan(&kind, &text, &sender, &waSender, &blob)
 	if err != nil {
 		return nil
 	}
@@ -78,6 +78,8 @@ func (q *quoting) cols() (string, string, string, string, string) {
 // setContext puts the context on a media message's part.
 func setContext(m *waE2E.Message, ci *waE2E.ContextInfo) {
 	switch {
+	case m.ExtendedTextMessage != nil:
+		m.ExtendedTextMessage.ContextInfo = ci
 	case m.ImageMessage != nil:
 		m.ImageMessage.ContextInfo = ci
 	case m.VideoMessage != nil:

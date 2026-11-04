@@ -322,6 +322,23 @@ BarWidget {
     target: root.wa
     ignoreUnknownSignals: true
     function onUnreadPreview(chat, msgs) { root.previews[chat] = msgs; root.previewsRev++ }
+    function onAccountReset() { root.previews = ({}); root.previewsRev++; root.popupOpen = false }
+    function onMessagesRemoved(chat, ids) {
+      if (!root.previews[chat]) return
+      root.previews[chat] = root.previews[chat].filter(function(m) { return ids.indexOf(m.id) < 0 })
+      root.previewsRev++
+    }
+  }
+  Timer {
+    interval: 1000
+    repeat: true
+    running: { root.previewsRev; return !!root.wa && Object.keys(root.previews).length > 0 }
+    onTriggered: {
+      for (var chat in root.previews) {
+        var ids = root.previews[chat].filter(function(m) { return !root.wa.available(m) }).map(function(m) { return m.id })
+        if (ids.length) root.wa.removeMessages(chat, ids)
+      }
+    }
   }
   onUnreadChatsChanged: if (popupOpen) root.askPreviews()
   function askPreviews() {

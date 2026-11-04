@@ -37,9 +37,10 @@ type Msg struct {
 	Sender string `json:"sender"`
 	// Who wrote it, as the chat shows them: "" for you, the contact's
 	// name, "~push name" for people you haven't saved, else the number.
-	Name   string `json:"name"`
-	FromMe bool   `json:"from_me"`
-	TS     int64  `json:"ts"`
+	Name      string `json:"name"`
+	FromMe    bool   `json:"from_me"`
+	TS        int64  `json:"ts"`
+	ExpiresAt int64  `json:"expires_at,omitempty"`
 	// text, image, video, gif, ptv, audio, ptt, document, sticker,
 	// location, live_location, contact, poll, event, invite, call, card,
 	// system, revoked, view_once, placeholder, unsupported.
@@ -101,11 +102,12 @@ type Chat struct {
 
 // Last is a chat's newest message, for its row.
 type Last struct {
-	ID     string `json:"id"`
-	FromMe bool   `json:"from_me"`
-	Status int    `json:"status"`
-	Kind   string `json:"kind"`
-	Text   string `json:"text,omitempty"`
+	ExpiresAt int64  `json:"expires_at,omitempty"`
+	ID        string `json:"id"`
+	FromMe    bool   `json:"from_me"`
+	Status    int    `json:"status"`
+	Kind      string `json:"kind"`
+	Text      string `json:"text,omitempty"`
 	// Who wrote it, in a group: the name its messages show.
 	Who     string          `json:"who,omitempty"`
 	Seconds uint32          `json:"secs,omitempty"`
@@ -223,6 +225,9 @@ type Bridge struct {
 	// Whether the app's window is in front: WhatsApp then counts you as
 	// online, as it does WhatsApp Web's tab.
 	online atomic.Bool
+	// Serialize message/cache persistence with expiry cleanup.
+	mediaMu   sync.Mutex
+	messageMu sync.Mutex
 }
 
 type avatarReq struct {
@@ -268,7 +273,7 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "app.db")+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)")
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "app.db")+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=secure_delete(ON)")
 	if err != nil {
 		fatal(err)
 	}
@@ -282,6 +287,7 @@ func main() {
 	// whatsmeow's context logger, for the favorites' version (see favLog).
 	b.ctx = zerolog.New(favLog{b}).Level(zerolog.DebugLevel).WithContext(ctx)
 	b.cli.BackgroundEventCtx = b.ctx
+	b.cli.SetMediaHTTPClient(mediaHTTPClient())
 	b.cli.AppStateDebugLogs = true
 	// Pins, archives, mutes and favorites also from the first full sync, not
 	// only from the changes after it.
@@ -292,6 +298,9 @@ func main() {
 	if b.cli.Store.ID == nil {
 		b.wipe()
 	}
+	b.recoverExpiry()
+	b.expireMessages()
+	go b.expiryLoop()
 	go b.flushChats()
 	go b.sweep()
 	go b.chatActions()
@@ -412,6 +421,9 @@ func (b *Bridge) commands() {
 		case "download":
 			go b.download(c.Chat, c.ID, c.Auto)
 		case "play", "pause", "resume", "seek", "speed", "stop":
+			if c.C == "play" && !b.messageLive(c.Chat, c.ID) {
+				continue
+			}
 			player.command(c)
 			if c.C == "play" {
 				go b.markPlayed(c.Chat, c.ID)

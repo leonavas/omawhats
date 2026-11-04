@@ -219,3 +219,18 @@ func (b *Bridge) markPlayed(chat, id string) {
 		logf("played %s: %v", id, err)
 	}
 }
+
+func (p *Player) expire(chat string, ids []string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.chat != chat {
+		return
+	}
+	for _, id := range ids {
+		if p.id == id {
+			p.send("stop")
+			p.chat, p.id = "", ""
+			return
+		}
+	}
+}

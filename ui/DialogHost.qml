@@ -21,6 +21,17 @@ Item {
   readonly property var wa: app.wa
   property string name: ""
   property var args: ({})
+  Connections {
+    target: host.wa
+    function onAccountReset() { host.name = ""; host.args = ({}) }
+    function onMessagesRemoved(chat, ids) {
+      var msgs = host.args.msgs || (host.args.msg ? [host.args.msg] : [])
+      if (msgs.some(function(m) { return m.chat === chat && ids.indexOf(m.id) >= 0 })) {
+        // Discard the editor too; expiry must not commit its stale contents.
+        host.name = ""; host.args = ({})
+      }
+    }
+  }
   readonly property bool shown: name !== ""
   visible: shown
   z: 800
