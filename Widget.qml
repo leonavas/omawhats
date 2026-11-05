@@ -471,7 +471,9 @@ BarWidget {
     id: outlineIcon
 
     Image {
-      anchors.fill: parent
+      // Sized here: omarchy's icon Loader has no size to fill.
+      width: Style.bar.iconCanvas
+      height: Style.bar.iconCanvas
       fillMode: Image.PreserveAspectFit
       sourceSize.width: Math.round(width * Screen.devicePixelRatio)
       sourceSize.height: Math.round(height * Screen.devicePixelRatio)
@@ -485,7 +487,9 @@ BarWidget {
     id: colorIcon
 
     Image {
-      anchors.fill: parent
+      // Sized here: omarchy's icon Loader has no size to fill.
+      width: Style.bar.iconCanvas
+      height: Style.bar.iconCanvas
       fillMode: Image.PreserveAspectFit
       // Decode at physical pixels: the logical size leaves it blurry on HiDPI.
       sourceSize.width: Math.round(width * Screen.devicePixelRatio)
