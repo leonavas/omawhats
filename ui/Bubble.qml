@@ -364,6 +364,9 @@ Item {
     id: textC
     TextEdit {
       id: te
+      // The room for the time: a zero-width space (where the line may break)
+      // then the spacer, held by a word joiner so that, wrapped, it takes a
+      // line of the font's height and not of its own 1 px.
       readonly property real spacerWidth: (b.metaOver ? 0 : meta.implicitWidth + b.t.sp(10))
       property bool expanded: false
       width: Math.min(implicitWidth, parent ? parent.width : implicitWidth)
@@ -384,7 +387,7 @@ Item {
         link: b.t.html.link, mention: b.t.html.mention, code: b.t.html.code, codeBg: b.t.html.codeBg,
         quote: b.t.html.quote, quoteText: b.t.html.quoteText, mentions: b.m.mentions, you: b.app.tr("You", "Você"),
         limit: te.expanded ? 0 : 2000, moreLabel: b.app.tr("Read more", "Ler mais"),
-        spacer: te.spacerWidth > 0 ? "&#8203;<img src=\"" + Qt.resolvedUrl("../assets/spacer.png") + "\" width=\"" + Math.round(te.spacerWidth) + "\" height=\"1\">" : ""
+        spacer: te.spacerWidth > 0 ? "&#8203;&#8288;<img src=\"" + Qt.resolvedUrl("../assets/spacer.png") + "\" width=\"" + Math.round(te.spacerWidth) + "\" height=\"1\">" : ""
       })
       onLinkActivated: url => {
         if (url.indexOf("mention:") === 0) b.win.showProfile(url.slice(8))
@@ -405,7 +408,7 @@ Item {
       // image with a line of the selection's color across it.
       onSelectedTextChanged: {
         if (te.selectedText === "") return
-        if (te.selectedText.replace(/[\u200b\ufffc]/g, "") === "") { te.deselect(); return }
+        if (te.selectedText.replace(/[\u200b\u2060\ufffc]/g, "") === "") { te.deselect(); return }
         var end = te.length - 1
         if (te.spacerWidth > 0 && te.selectionEnd > end) {
           if (te.cursorPosition === te.selectionStart) te.select(end, te.selectionStart)
@@ -447,7 +450,7 @@ Item {
       }
       // As plain text: lines as lines, without the room kept for the time.
       function copySelection() {
-        b.app.copy(te.selectedText.replace(/[\u200b\ufffc]/g, "").replace(/[\u2028\u2029]/g, "\n"))
+        b.app.copy(te.selectedText.replace(/[\u200b\u2060\ufffc]/g, "").replace(/[\u2028\u2029]/g, "\n"))
       }
     }
   }
