@@ -185,26 +185,29 @@ Item {
   }
   function note(to) { return JSON.stringify({ from: u.version, to: to, open: !!u.app.windowOpen }) }
 
-  // What the terminal runs: what's new (the commits it brings), a yes or
-  // no (gum's, styled by the launcher), Omarchy's update (--yes: this was
-  // its confirm), the shell's restart. A no, or Ctrl+C, leaves 130, the
-  // code the launcher closes the terminal on without its "Done!". $1 the
-  // plugin's id, $2 where the note goes, $3 and $4 the versions, $5 the
-  // plugin's folder.
+  // What the terminal runs: Omarchy's own update, without --yes, so the
+  // diff it shows and the yes it asks for are of the very commit it fetched
+  // and installs (one fetch, nothing in between). Its output goes to the
+  // terminal, as its confirm needs one; errors are kept for the notice.
+  // Whether anything came in is HEAD before and after: unchanged, it was
+  // up to date (FETCH_HEAD is HEAD) or skipped. Then the shell's restart.
+  // A skip, or Ctrl+C, leaves 130, the code the launcher closes the
+  // terminal on without its "Done!". $1 the plugin's id, $2 where the note
+  // goes, $3 and $4 the versions, $5 the plugin's folder.
   readonly property string script: [
     'id=$1 b=$2 from=$3 to=$4 dir=$5',
     'say() { printf "\\033[34m●\\033[0m %s\\n" "$*"; }',
     'echo',
     'say "Updating Omawhats $from → $to"',
-    'new=$(git -C "$dir" fetch -q 2>/dev/null && git -C "$dir" log --reverse --format="    • %s" HEAD..FETCH_HEAD)',
-    '[ -n "$new" ] && printf "\\n  What\'s new:\\n%s\\n" "$new"',
-    'printf "\\n  It runs:\\n    omarchy plugin update %s --yes\\n    omarchy-restart-shell\\n\\n" "$id"',
-    'if ! gum confirm "Update Omawhats to $to?"; then say "Update cancelled"; echo cancelled >"$b.log"; echo 130 >"$b.rc"; exit 130; fi',
-    'say "omarchy plugin update $id --yes"',
-    'omarchy plugin update "$id" --yes >"$b.log" 2>&1; rc=$?',
-    'if [ $rc -ne 0 ]; then printf "\\033[31m%s\\033[0m\\n" "$(tail -n 3 "$b.log")"',
-    'elif grep -q " is up to date\\.$" "$b.log"; then say "Already up to date"',
-    'else say "omarchy-restart-shell"; omarchy-restart-shell >>"$b.log" 2>&1 || rc=$?; [ $rc -eq 0 ] && say "Omawhats $to is in"; fi',
+    'printf "\\n  omarchy plugin update %s shows the changes and asks before installing them.\\n\\n" "$id"',
+    'old=$(git -C "$dir" rev-parse HEAD 2>/dev/null)',
+    'omarchy plugin update "$id" 2> >(tee "$b.log" >&2); rc=$?; wait $! 2>/dev/null',
+    'new=$(git -C "$dir" rev-parse HEAD 2>/dev/null)',
+    'if [ $rc -ne 0 ]; then printf "\\033[31m%s\\033[0m\\n" "Update failed"; [ -s "$b.log" ] || echo "omarchy plugin update failed ($rc)" >"$b.log"',
+    'elif [ "$old" = "$new" ]; then',
+    '  if [ "$new" = "$(git -C "$dir" rev-parse FETCH_HEAD 2>/dev/null)" ]; then say "Already up to date"; echo "$id is up to date." >"$b.log"',
+    '  else say "Update cancelled"; echo cancelled >"$b.log"; rc=130; fi',
+    'else say "omarchy-restart-shell"; omarchy-restart-shell >>"$b.log" 2>&1 || rc=$?; v=$(grep -m1 -o "\\"version\\": *\\"[^\\"]*\\"" "$dir/manifest.json" | cut -d\\" -f4); [ $rc -eq 0 ] && say "Omawhats ${v:-$to} is in"; fi',
     'echo $rc >"$b.rc"',
     'exit $rc'
   ].join("\n")

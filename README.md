@@ -81,8 +81,9 @@ click opens the menu. Every option is in the widget's settings.
 
 Every six hours the app reads `manifest.json` on this repo's `main` branch
 (a plain `curl`, nothing of yours is sent). When there's a new version, a
-notice offers a one-click update (`omarchy plugin update`). Turn the check
-off in Settings.
+notice offers a one-click update: Omarchy's floating terminal runs
+`omarchy plugin update`, which shows the diff of what it fetched and asks
+before installing exactly that. Turn the check off in Settings.
 
 ## Files
 
