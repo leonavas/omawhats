@@ -38,7 +38,8 @@ Item {
 
   // ------------------------------------------------------------ drafts
   property bool _loading: false
-  onChatChanged: box.loadDraft()
+  // Leaving the chat mid-recording drops the note: it never goes elsewhere.
+  onChatChanged: { box.stopRecording(false); box.loadDraft() }
   Component.onCompleted: box.loadDraft()
   Connections {
     target: box.app
@@ -63,7 +64,8 @@ Item {
 
   // ------------------------------------------------------------ typing
   property real _lastTyping: 0
-  Timer { id: pausedSoon; interval: 4000; onTriggered: box.wa.typingState(box.chat, "paused") }
+  // "paused" goes to the chat typed in, even if another is open by then.
+  Timer { id: pausedSoon; interval: 4000; property string chat: ""; onTriggered: box.wa.typingState(chat, "paused") }
   function typed() {
     if (box._loading) return
     draftSave.account = box.app.draftAccount
@@ -73,6 +75,7 @@ Item {
     draftSave.restart()
     if (!input.text) { pausedSoon.stop(); if (box._lastTyping) { box.wa.typingState(box.chat, "paused"); box._lastTyping = 0 } return }
     if (Date.now() - box._lastTyping > 3000) { box._lastTyping = Date.now(); box.wa.typingState(box.chat, "composing") }
+    pausedSoon.chat = box.chat
     pausedSoon.restart()
   }
 
@@ -220,8 +223,12 @@ Item {
     input.select(a, a + sel.length + mark.length * 2)
   }
 
+  // The clipboard and the file chooser answer later: if another chat is open
+  // by then, what they bring is dropped, never sent there.
   function paste() {
+    var chat = box.chat
     box.app.readClipboard(function(r) {
+      if (box.chat !== chat) { if (r.image) Quickshell.execDetached(["rm", "-f", r.image]); return }
       // A picture (a screenshot, say) goes to the preview, as one attached
       // does.
       if (r.image || (r.files && r.files.length)) box.preview({ files: r.image ? [r.image] : r.files, temp: !!r.image })
@@ -230,11 +237,13 @@ Item {
   }
 
   function attach(kind) {
+    var chat = box.chat
     var tr = box.app.tr
     var filter = kind === "media" ? tr("Photos and videos", "Fotos e vídeos") + " (*.jpg *.jpeg *.png *.webp *.gif *.mp4 *.mov *.m4v *.3gp *.webm *.mkv)"
                : kind === "audio" ? tr("Audio", "Áudio") + " (*.mp3 *.m4a *.ogg *.opus *.aac *.wav *.flac *.amr)" : ""
     box.win.pickFiles(kind === "document" ? tr("Send documents", "Enviar documentos") : kind === "audio" ? tr("Send audio", "Enviar áudio") : tr("Send photos and videos", "Enviar fotos e vídeos"),
                       filter, function(files) {
+      if (box.chat !== chat) return
       box.preview({ files: files, asDocument: kind === "document", asAudio: kind === "audio" })
     })
   }
@@ -245,35 +254,50 @@ Item {
   property real recNow: 0
   property string recPath: ""
   property bool recSend: false
+  property bool recStopping: false
+  property string recChat: ""
+  property string recReply: ""
   Process {
     id: recorder
+    // ffmpeg closes the file a moment after the stop: by then another chat
+    // may be open, so the note goes to the chat it was recorded in, as the
+    // reply chosen when it was sent.
     onExited: (code, status) => {
       var path = box.recPath
       var send = box.recSend
+      var chat = box.recChat
       box.recording = false
-      box.wa.typingState(box.chat, "paused")
-      if (send && path && (box.recNow - box.recStart) > 700) box.wa.sendFile(box.chat, path, "ptt", "", box.replyTo ? box.replyTo.id : "", true)
+      box.recStopping = false
+      box.wa.typingState(chat, "paused")
+      if (send && chat && path && (box.recNow - box.recStart) > 700) box.wa.sendFile(chat, path, "ptt", "", box.recReply, true)
       else if (path) Quickshell.execDetached(["rm", "-f", path])
-      if (send && box.view) box.view.replyTo = null
+      if (send && box.view && box.chat === chat) box.view.replyTo = null
     }
   }
   Timer { interval: 200; repeat: true; running: box.recording; onTriggered: box.recNow = Date.now() }
   // "recording audio…" for the other side, every few seconds.
-  Timer { interval: 5000; repeat: true; running: box.recording; onTriggered: box.wa.typingState(box.chat, "recording") }
+  Timer { interval: 5000; repeat: true; running: box.recording; onTriggered: box.wa.typingState(box.recChat, "recording") }
   function startRecording() {
     if (box.recording) return
     box.recPath = box.app.cacheDir + "/voice/" + Date.now() + ".ogg"
     box.recSend = false
+    box.recStopping = false
+    box.recChat = box.chat
+    box.recReply = ""
     recorder.command = ["sh", "-c", 'mkdir -p "$(dirname "$1")" && exec ffmpeg -hide_banner -loglevel error -nostdin -f pulse -i default -ac 1 -ar 48000 -c:a libopus -b:a 32k -application voip -y "$1"', "rec", box.recPath]
     recorder.running = true
     box.recording = true
     box.recStart = Date.now()
     box.recNow = box.recStart
-    box.wa.typingState(box.chat, "recording")
+    box.wa.typingState(box.recChat, "recording")
   }
+  // The first stop decides: a send already asked for isn't undone by a
+  // later chat switch.
   function stopRecording(send) {
-    if (!box.recording) return
+    if (!box.recording || box.recStopping) return
+    box.recStopping = true
     box.recSend = send
+    box.recReply = send && box.replyTo ? box.replyTo.id : ""
     recorder.signal(2)
   }
 

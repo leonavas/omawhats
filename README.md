@@ -146,6 +146,18 @@ The shell caches plugin QML, so reload edits with `omarchy-restart-shell`.
 IPC: `omarchy-shell omawhats toggle` (also `show`, `hide`,
 `open <jid>`, `pause <minutes>`, `resume`, `status`).
 
+### While the marketplace review is open
+
+Omawhats is under review at
+[omacom/omarchy-plugin-marketplace#11728](https://github.com/omacom/omarchy-plugin-marketplace/issues/11728).
+Each push to `main` moves the HEAD the reviewer looks at, so until the
+plugin is listed:
+
+- New features and improvements go to a branch, not `main`.
+- `main` gets only fixes for the reviewer's findings, each answered in the
+  issue with its commit.
+- Once it's listed, merge the branch and release as usual.
+
 ## Disclaimer
 
 Unofficial client, not affiliated with WhatsApp LLC or Meta Platforms, Inc.
