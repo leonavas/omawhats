@@ -154,10 +154,10 @@ Omawhats is under review at
 Each push to `main` moves the HEAD the reviewer looks at, so until the
 plugin is listed:
 
-- New features and improvements go to a branch, not `main`.
+- New features and improvements go to the `next` branch, not `main`.
 - `main` gets only fixes for the reviewer's findings, each answered in the
   issue with its commit.
-- Once it's listed, merge the branch and release as usual.
+- Once it's listed, merge `next` into `main` and release as usual.
 
 ## Disclaimer
 
