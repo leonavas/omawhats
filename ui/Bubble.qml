@@ -202,7 +202,7 @@ Item {
       id: linkLoader
       active: !!b.x_.link && (b.x_.link.title || b.x_.link.desc) && b.kind === "text"
       width: parent.width
-      sourceComponent: LinkCard { app: b.app; link: b.x_.link }
+      sourceComponent: LinkCard { app: b.app; link: b.x_.link; thumb: b.x_.thumb || "" }
     }
 
     Loader {

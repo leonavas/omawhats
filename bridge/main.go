@@ -164,6 +164,8 @@ type Cmd struct {
 	App   string `json:"app"`
 	Icon  string `json:"icon"`
 	Exec  string `json:"exec"`
+	// send: the preview of its link the app showed, to go along.
+	Preview *LinkPreview `json:"preview"`
 }
 
 var (
@@ -359,6 +361,8 @@ func (b *Bridge) commands() {
 			go b.unread(c.Chat, c.Limit)
 		case "send":
 			go b.send(c)
+		case "link_preview":
+			go b.linkPreview(c.Text)
 		case "react":
 			go b.sendReaction(c.Chat, c.ID, c.Text)
 		case "edit":

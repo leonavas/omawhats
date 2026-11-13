@@ -252,7 +252,7 @@ func (b *Bridge) expireMessages() {
 				paths = append(paths, stickerFile(sticker.GetFileSHA256()))
 			}
 		}
-		for _, kind := range []string{"thumb", "frame", "x"} {
+		for _, kind := range []string{"thumb", "frame", "x", "link"} {
 			paths = append(paths, thumbFile(e.chat, e.id, kind))
 		}
 		removed := true

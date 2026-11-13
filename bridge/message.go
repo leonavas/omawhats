@@ -275,6 +275,9 @@ func (b *Bridge) storeIncoming(e *events.Message, status int, expires int64) *Ms
 		if md, part := mediaOf(e.Message); md != nil {
 			b.storeMedia(m.Chat, m.ID, md, part, e.Info.Chat.String(), e.Info.Sender.String())
 		}
+		if c.X != nil && c.X["link"] != nil {
+			b.linkThumb(m.Chat, m.ID, m.TS, e.Message.GetExtendedTextMessage())
+		}
 	}
 	b.dirty.Store(true)
 	// As stored, with its media and names; `fresh` is this call's to say

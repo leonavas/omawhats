@@ -4,6 +4,7 @@ package main
 // there: read receipts, "typing…", online.
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -79,6 +80,9 @@ func (b *Bridge) send(c Cmd) {
 	q := b.quoting(c.Chat, c.Reply)
 	mentioned, all := b.mentionedJIDs(jid, text)
 	link := firstURL(text)
+	var ext *waE2E.ExtendedTextMessage
+	var xs string
+	var thumbData []byte
 	if q != nil || len(mentioned) > 0 || all || link != "" {
 		ci := &waE2E.ContextInfo{}
 		if q != nil {
@@ -88,19 +92,32 @@ func (b *Bridge) send(c Cmd) {
 		if all {
 			ci.NonJIDMentions = proto.Uint32(1)
 		}
-		ext := &waE2E.ExtendedTextMessage{Text: proto.String(text), ContextInfo: ci}
+		ext = &waE2E.ExtendedTextMessage{Text: proto.String(text), ContextInfo: ci}
 		if link != "" {
 			ext.MatchedText = proto.String(link)
+		}
+		// The preview the app showed, while its link is still in the text.
+		if p := c.Preview; p != nil && p.URL != "" && strings.Contains(text, p.URL) && (p.Title != "" || p.Desc != "") {
+			if p.Image != "" && !isPreviewFile(p.Image) {
+				p.Image = ""
+			}
+			var x map[string]any
+			x, thumbData = withPreview(ext, p, c.Chat, id)
+			js, _ := json.Marshal(x)
+			xs = string(js)
 		}
 		out = &waE2E.Message{ExtendedTextMessage: ext}
 	}
 	expires := b.outgoingDeadline(c.Chat, out, now)
 	qID, qFrom, qKind, qText, qThumb := q.cols()
-	b.db.Exec(`INSERT INTO messages (chat, id, sender, from_me, ts, kind, text, quote_id, quote_from, quote_kind, quote_text, quote_thumb, status, expires_at)
-		VALUES (?, ?, ?, 1, ?, 'text', ?, ?, ?, ?, ?, ?, 0, ?)`, c.Chat, id, me.String(), now, text, qID, qFrom, qKind, qText, qThumb, expires)
+	b.db.Exec(`INSERT INTO messages (chat, id, sender, from_me, ts, kind, text, x, quote_id, quote_from, quote_kind, quote_text, quote_thumb, status, expires_at)
+		VALUES (?, ?, ?, 1, ?, 'text', ?, ?, ?, ?, ?, ?, ?, 0, ?)`, c.Chat, id, me.String(), now, text, xs, qID, qFrom, qKind, qText, qThumb, expires)
 	b.db.Exec(`INSERT INTO chats (jid, last_ts) VALUES (?, ?) ON CONFLICT (jid) DO UPDATE SET last_ts = excluded.last_ts, cleared = 0, archived = 0`, c.Chat, now)
 	b.emitMsg(c.Chat, id)
 	b.flush()
+	if len(thumbData) > 0 {
+		b.uploadLinkThumb(ext, c.Preview, thumbData)
+	}
 
 	_, err = b.cli.SendMessage(b.ctx, jid, out, whatsmeow.SendRequestExtra{ID: id})
 	if err != nil {

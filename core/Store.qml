@@ -41,6 +41,8 @@ Item {
       wa.downloads = ({})
       wa._onDownloaded = ({})
       wa.downloadsRev++
+      wa.linkPreviews = ({})
+      wa.linkPreviewsRev++
     }
   }
   readonly property alias bridge: bridge
@@ -740,6 +742,10 @@ Item {
     case "reaction":
       wa.reacted(ev)
       break
+    case "link_preview":
+      wa.linkPreviews[ev.url] = ev.preview || null
+      wa.linkPreviewsRev++
+      break
     case "unread":
       wa.unreadPreview(ev.chat, ev.msgs || [])
       break
@@ -774,10 +780,28 @@ Item {
   }
 
   // ---------------------------------------------------------------- actions
-  function sendText(chat, text, reply) {
+  function sendText(chat, text, reply, preview) {
     text = String(text || "").trim()
     if (!chat || !text) return
-    wa.send({ c: "send", chat: chat, text: text, reply: reply || "" })
+    var cmd = { c: "send", chat: chat, text: text, reply: reply || "" }
+    if (preview) cmd.preview = preview
+    wa.send(cmd)
+  }
+
+  // ---------------------------------------------------------------- link previews
+  // A link typed in the box: its page's title, description and picture,
+  // asked once per address. `false` while asked, null when it has none.
+  property var linkPreviews: ({})
+  property int linkPreviewsRev: 0
+  function linkPreview(url) {
+    wa.linkPreviewsRev
+    return url && (url in wa.linkPreviews) ? wa.linkPreviews[url] : null
+  }
+  function askLinkPreview(url) {
+    if (!url || (url in wa.linkPreviews)) return
+    wa.linkPreviews[url] = false
+    wa.linkPreviewsRev++
+    wa.send({ c: "link_preview", text: url })
   }
   function sendFile(chat, path, kind, caption, reply, temp) {
     wa.send({ c: "send_file", chat: chat, path: path, kind: kind || U.kindOf(path), caption: caption || "", reply: reply || "", temp: !!temp })

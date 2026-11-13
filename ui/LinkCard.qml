@@ -2,38 +2,57 @@ import QtQuick
 import "../lib/Util.js" as U
 import "../lib/Registry.js" as Reg
 
-// A link's preview, over the message's text: its picture, title,
-// description and site.
+// A link's preview, over the message's text, as WhatsApp Web's: a wide
+// picture across the top when the message brought one, a small one on the
+// left otherwise; the title, description and site.
 Item {
   id: lc
   property var app: Reg.service
   readonly property var t: app.theme
   property var link: ({})
+  // The small picture inside the message (the x object's thumb).
+  property string thumb: ""
+  // Over the message box: no click, the box's own colors.
+  property bool composer: false
   readonly property string host: String(link.url || "").replace(/^https?:\/\//, "").split("/")[0].replace(/^www\./, "")
-  readonly property bool hasThumb: !!link.thumb || false
+  readonly property string image: link.image || ""
+  readonly property bool big: !composer && !!image && (link.w || 0) >= 300 && (link.h || 0) > 0 && link.w / link.h >= 1.2
+  readonly property string sideSrc: image || thumb
+  readonly property bool hasSide: !big && !!sideSrc
 
-  implicitWidth: Math.min(t.sp(420), Math.max(titleText.implicitWidth, t.sp(240)) + t.sp(20) + (thumbBox.visible ? thumbBox.width : 0))
-  height: Math.max(col.implicitHeight + t.sp(16), thumbBox.visible ? thumbBox.height : 0) + t.sp(4)
+  implicitWidth: big ? t.sp(400) : Math.min(t.sp(420), Math.max(titleText.implicitWidth, t.sp(240)) + t.sp(20) + (sideBox.visible ? sideBox.width : 0))
+  height: (big ? bigBox.height + col.implicitHeight + t.sp(16) : Math.max(col.implicitHeight + t.sp(16), sideBox.visible ? sideBox.height : 0)) + t.sp(4)
 
   Clip {
     width: parent.width
     height: parent.height - lc.t.sp(4)
     radius: lc.t.sp(7)
-    color: Qt.rgba(0, 0, 0, lc.t.dark ? 0.2 : 0.06)
+    color: lc.composer ? lc.t.alpha(lc.t.fg, 0.07) : Qt.rgba(0, 0, 0, lc.t.dark ? 0.2 : 0.06)
     Image {
-      id: thumbBox
-      visible: lc.hasThumb && status !== Image.Error
+      id: bigBox
+      visible: lc.big && status !== Image.Error
+      width: parent.width
+      height: visible ? Math.min(width * lc.link.h / lc.link.w, width * 0.75) : 0
+      source: lc.big ? U.fileUrl(lc.image) : ""
+      fillMode: Image.PreserveAspectCrop
+      asynchronous: true
+      smooth: true
+      sourceSize.width: width * 2
+    }
+    Image {
+      id: sideBox
+      visible: lc.hasSide && status !== Image.Error
       width: lc.t.sp(84)
       height: Math.max(lc.t.sp(84), col.implicitHeight + lc.t.sp(16))
-      source: lc.link.thumb ? U.fileUrl(lc.link.thumb) : ""
+      source: lc.hasSide ? U.fileUrl(lc.sideSrc) : ""
       fillMode: Image.PreserveAspectCrop
       asynchronous: true
       smooth: true
     }
     Column {
       id: col
-      x: (thumbBox.visible ? thumbBox.width : 0) + lc.t.sp(10)
-      y: lc.t.sp(8)
+      x: (sideBox.visible ? sideBox.width : 0) + lc.t.sp(10)
+      y: bigBox.height + lc.t.sp(8)
       width: parent.width - x - lc.t.sp(10)
       spacing: lc.t.sp(3)
       Text {
@@ -58,7 +77,7 @@ Item {
         font.family: lc.t.font
         font.pixelSize: lc.t.fsSmall + 0.5
         wrapMode: Text.Wrap
-        maximumLineCount: 2
+        maximumLineCount: lc.big ? 3 : 2
         elide: Text.ElideRight
         textFormat: Text.PlainText
       }
@@ -72,6 +91,6 @@ Item {
         elide: Text.ElideRight
       }
     }
-    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: lc.app.openUrl(lc.link.url) }
+    MouseArea { enabled: !lc.composer; anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: lc.app.openUrl(lc.link.url) }
   }
 }

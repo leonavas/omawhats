@@ -56,6 +56,9 @@ Item {
     input.cursorPosition = input.length
     box._loading = false
     box.mentionNames = ({})
+    box.linkClosed = ""
+    box.linkUrl = ""
+    linkSoon.restart()
     box.emojiAt = -1
     box.emojiDismissed = -1
     panel.visible = false
@@ -166,11 +169,37 @@ Item {
     input.forceActiveFocus()
   }
 
+  // ------------------------------------------------------------ link preview
+  // The first link in the box gets its page's preview over it, as WhatsApp
+  // Web's, a moment after it's typed or pasted; it goes along with the
+  // message unless closed (the ✕). The link is found as the bridge finds it.
+  property string linkUrl: ""
+  property string linkClosed: ""
+  // false while asked, the preview once here, null when the page has none.
+  readonly property var linkInfo: box.linkUrl && box.linkUrl !== box.linkClosed ? box.wa.linkPreview(box.linkUrl) : null
+  readonly property bool linkLoading: box.linkInfo === false
+  readonly property bool linkReady: !!box.linkInfo && typeof box.linkInfo === "object"
+  Timer { id: linkSoon; interval: 500; onTriggered: box.checkLink() }
+  function firstUrl(text) {
+    var ws = String(text).split(/\s+/)
+    for (var i = 0; i < ws.length; i++) if (/^https?:\/\//.test(ws[i])) return ws[i].replace(/[.,;:!?)]+$/, "")
+    return ""
+  }
+  function checkLink() {
+    var url = box.firstUrl(input.text)
+    if (url === box.linkUrl) return
+    box.linkUrl = url
+    if (url && url !== box.linkClosed) box.wa.askLinkPreview(url)
+  }
+
   // ------------------------------------------------------------ send
   function send() {
     var text = input.text.trim()
     if (!text) return
-    box.wa.sendText(box.chat, box.withMentions(text), box.replyTo ? box.replyTo.id : "")
+    linkSoon.stop()
+    var url = box.firstUrl(text)
+    var preview = box.linkReady && box.linkInfo.url === url && url !== box.linkClosed ? box.linkInfo : null
+    box.wa.sendText(box.chat, box.withMentions(text), box.replyTo ? box.replyTo.id : "", preview)
     box.view.replyTo = null
     box.clear()
     input.forceActiveFocus()
@@ -181,6 +210,8 @@ Item {
     input.text = ""
     box._loading = false
     box.mentionNames = ({})
+    box.linkUrl = ""
+    box.linkClosed = ""
     draftSave.stop()
     box.app.setDraft(box.chat, "")
     pausedSoon.stop()
@@ -361,6 +392,43 @@ Item {
     y: (panel.visible ? panel.height : 0) + (mentions.visible ? mentions.height : 0) + box.t.sp(6)
     width: parent.width - box.t.sp(32)
     spacing: box.t.sp(4)
+    // The link's preview, as it will go.
+    Item {
+      visible: box.linkLoading || box.linkReady
+      width: parent.width
+      height: visible ? (box.linkReady ? linkBox.height : box.t.sp(44)) + box.t.sp(4) : 0
+      LinkCard {
+        id: linkBox
+        visible: box.linkReady
+        app: box.app
+        composer: true
+        width: parent.width - box.t.sp(48)
+        link: box.linkReady ? box.linkInfo : ({})
+      }
+      Rectangle {
+        visible: box.linkLoading
+        width: parent.width - box.t.sp(48)
+        height: box.t.sp(40)
+        radius: box.t.sp(7)
+        color: box.t.alpha(box.t.fg, 0.07)
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          x: box.t.sp(12)
+          text: box.app.tr("Loading link preview…", "Carregando prévia do link…")
+          color: box.t.dim
+          font.family: box.t.font
+          font.pixelSize: box.t.fsSmall + 1
+          textFormat: Text.PlainText
+        }
+      }
+      IconButton {
+        anchors.right: parent.right
+        y: box.t.sp(4)
+        icon: "close"
+        tip: box.app.tr("Remove preview", "Remover prévia")
+        onClicked: { box.linkClosed = box.linkUrl; input.forceActiveFocus() }
+      }
+    }
     // The message being answered.
     Item {
       visible: !!box.replyTo
@@ -453,7 +521,7 @@ Item {
         selectionColor: box.t.alpha(box.t.accent, 0.4)
         selectedTextColor: box.t.textBright
         onCursorRectangleChanged: scroller.ensureVisible(cursorRectangle)
-        onTextChanged: { box.typed(); box.checkMention(); box.checkEmoji() }
+        onTextChanged: { box.typed(); box.checkMention(); box.checkEmoji(); linkSoon.restart() }
         onCursorPositionChanged: { box.checkMention(); box.checkEmoji() }
 
         Text {
