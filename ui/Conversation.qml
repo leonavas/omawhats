@@ -32,6 +32,15 @@ Item {
     if (!conv.selecting) conv.selecting = true
     conv.forceActiveFocus()
   }
+  // An album: all of it, or none when it all was.
+  function toggleSelectAll(msgs) {
+    var s = conv.selected
+    var all = msgs.every(function(m) { return !!s[m.id] })
+    msgs.forEach(function(m) { if (all) delete s[m.id]; else s[m.id] = m })
+    conv.selectedRev++
+    if (!conv.selecting) conv.selecting = true
+    conv.forceActiveFocus()
+  }
   function endSelect() { conv.selecting = false; conv.selected = ({}); conv.selectedRev++ }
   // The message box goes away while selecting: Esc here leaves it, or, when
   // not selecting, goes on to the window's (closing the chat).

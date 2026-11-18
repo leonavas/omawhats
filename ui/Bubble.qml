@@ -29,9 +29,11 @@ Item {
   readonly property var x_: L.parseX(m.x)
   readonly property var media: m.media || null
   readonly property bool sticker: kind === "sticker"
+  // An album: its photos and videos, `m` the newest of them.
+  readonly property var album: row.items || null
   readonly property bool jumbo: row.jumbo > 0
   readonly property bool bare: sticker
-  readonly property bool visual: kind === "image" || kind === "video" || kind === "gif" || kind === "ptv" || (kind === "card" && !!media && media.kind !== "document")
+  readonly property bool visual: !!album || kind === "image" || kind === "video" || kind === "gif" || kind === "ptv" || (kind === "card" && !!media && media.kind !== "document")
   readonly property bool showText: m.text !== undefined && m.text !== "" && kind !== "poll" && kind !== "event" && kind !== "system"
   // A shared place with nothing written about it: only the map, the time
   // over it, as WhatsApp Web's.
@@ -41,7 +43,7 @@ Item {
   readonly property bool group: row.group
   readonly property bool showName: group && !mine && row.first && !bare
   readonly property color bg: mine ? t.bubbleOut : t.bubbleIn
-  readonly property bool canReact: ["revoked", "placeholder", "system", "unsupported", "call"].indexOf(kind) < 0
+  readonly property bool canReact: !album && ["revoked", "placeholder", "system", "unsupported", "call"].indexOf(kind) < 0
   readonly property real padX: visual || mapOnly ? t.sp(3) : t.sp(8)
   readonly property real padTop: (visual || mapOnly) && !showName && !m.fwd && !m.quote ? t.sp(3) : t.sp(6)
   readonly property real padBottom: metaOver ? t.sp(3) : t.sp(8)
@@ -180,6 +182,7 @@ Item {
       active: b.kind !== "text"
       width: b.bare ? undefined : parent.width
       sourceComponent: {
+        if (b.album) return albumC
         switch (b.kind) {
         case "image": case "video": case "gif": case "ptv": return visualC
         case "sticker": return stickerC
@@ -327,6 +330,7 @@ Item {
   }
 
   function openMenu(anchor, dx, dy) {
+    if (b.album) { b.openAlbumMenu(anchor, dx, dy); return }
     var tr = b.app.tr
     var m = b.m
     var items = []
@@ -352,11 +356,32 @@ Item {
     b.win.menuAt(anchor, items, dx, dy)
   }
 
+  // An album's: what's done to it is done to all of its photos and videos.
+  function openAlbumMenu(anchor, dx, dy) {
+    var tr = b.app.tr
+    var all = b.album
+    var ids = all.map(function(x) { return x.id })
+    var c = b.wa.chat(b.m.chat)
+    var items = []
+    if (!(c && c.ro)) items.push({ label: tr("Reply", "Responder"), icon: "reply", action: function() { b.view.reply(all[0]) } })
+    items.push({ label: tr("Forward", "Encaminhar"), icon: "forward", action: function() { b.win.dialog("forward", { chat: b.m.chat, msgs: all }) } })
+    var starred = all.every(function(x) { return !!x.star })
+    items.push(starred ? { label: tr("Unstar", "Desfavoritar"), icon: "starFilled", action: function() { b.wa.star(b.m.chat, ids, false) } }
+                       : { label: tr("Star", "Favoritar"), icon: "star", action: function() { b.wa.star(b.m.chat, ids, true) } })
+    items.push({ label: tr("Download", "Baixar"), icon: "download", action: function() { all.forEach(b.saveOf) } })
+    items.push({ label: tr("Select", "Selecionar"), icon: "select", action: function() { b.view.toggleSelectAll(all) } })
+    items.push({ separator: true })
+    items.push({ label: tr("Delete", "Apagar"), icon: "delete", danger: true, action: function() { b.view.toggleSelectAll(all) } })
+    b.win.menuAt(anchor, items, dx, dy)
+  }
+
   // Downloads first when needed, then copies to ~/Downloads.
-  function save() {
-    var name = b.media.name || ""
-    if (b.media.file) { b.app.saveToDownloads(b.media.file, name || U.basename(b.media.file)); return }
-    b.wa.whenDownloaded(b.m, function(path) { b.app.saveToDownloads(path, name || U.basename(path)) })
+  function save() { b.saveOf(b.m) }
+  function saveOf(m) {
+    var media = m.media || {}
+    var name = media.name || ""
+    if (media.file) { b.app.saveToDownloads(media.file, name || U.basename(media.file)); return }
+    b.wa.whenDownloaded(m, function(path) { b.app.saveToDownloads(path, name || U.basename(path)) })
   }
 
   // ------------------------------------------------------------ components
@@ -453,6 +478,11 @@ Item {
         b.app.copy(te.selectedText.replace(/[\u200b\u2060\ufffc]/g, "").replace(/[\u2028\u2029]/g, "\n"))
       }
     }
+  }
+
+  Component {
+    id: albumC
+    Album { app: b.app; win: b.win; items: b.album; maxWidth: b.innerMax }
   }
 
   Component {

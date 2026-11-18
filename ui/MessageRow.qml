@@ -134,13 +134,23 @@ Item {
     Item {
       id: mi
       readonly property var m: r.row.m
+      // An album's photos and videos (its `m` is the newest of them).
+      readonly property var items: r.row.items || [m]
+      readonly property var reactions: r.row.items ? r.row.reactions : (m.reactions || [])
       readonly property bool mine: m.from_me
       readonly property bool group: r.row.group
       readonly property bool showAvatar: group && !mine
       readonly property bool selecting: !!r.view && r.view.selecting
-      readonly property bool isSelected: { if (!r.view) return false; r.view.selectedRev; return !!r.view.selected[m.id] }
+      readonly property bool isSelected: {
+        if (!r.view) return false
+        r.view.selectedRev
+        var s = r.view.selected
+        return mi.items.every(function(x) { return !!s[x.id] })
+      }
+      readonly property bool flashed: !!r.list && r.list.flashId !== "" && mi.items.some(function(x) { return x.id === r.list.flashId })
+      function toggle() { if (r.row.items) r.view.toggleSelectAll(mi.items); else r.view.toggleSelect(mi.m) }
       readonly property real topGap: r.row.first ? r.t.sp(12) : r.t.sp(2)
-      readonly property bool hasReactions: !!m.reactions && m.reactions.length > 0
+      readonly property bool hasReactions: reactions.length > 0
       readonly property real leftEdge: r.pad + (selecting ? r.t.sp(44) : 0) + (showAvatar ? r.t.sp(36) : 0)
       readonly property real maxWidth: Math.max(r.t.sp(180), (r.width - r.pad * 2 - (selecting ? r.t.sp(44) : 0) - (showAvatar ? r.t.sp(36) : 0)) * 0.72)
 
@@ -151,7 +161,7 @@ Item {
       Rectangle {
         anchors.fill: parent
         anchors.topMargin: mi.topGap - r.t.sp(2)
-        color: r.list && r.list.flashId === mi.m.id ? r.t.flash : (mi.isSelected ? r.t.alpha(r.t.accent, 0.12) : "transparent")
+        color: mi.flashed ? r.t.flash : (mi.isSelected ? r.t.alpha(r.t.accent, 0.12) : "transparent")
         Behavior on color { ColorAnimation { duration: 300 } }
       }
 
@@ -205,12 +215,12 @@ Item {
           anchors.centerIn: parent
           spacing: r.t.sp(2)
           Repeater {
-            model: (mi.m.reactions || []).slice(0, 3)
+            model: mi.reactions.slice(0, 3)
             delegate: Text { textFormat: Text.PlainText; required property var modelData; text: modelData.emoji; font.family: r.t.emojiFont; font.pixelSize: r.t.sp(15) }
           }
           Text {
             textFormat: Text.PlainText
-            readonly property int total: (mi.m.reactions || []).reduce(function(s, x) { return s + x.count }, 0)
+            readonly property int total: mi.reactions.reduce(function(s, x) { return s + x.count }, 0)
             visible: total > 1
             text: total
             color: r.t.dim
@@ -220,7 +230,7 @@ Item {
             leftPadding: r.t.sp(2)
           }
         }
-        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: r.win.dialog("reactions", { msg: mi.m, anchor: parent }) }
+        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: r.win.dialog("reactions", { msg: mi.items.filter(function(x) { return (x.reactions || []).length > 0 })[0] || mi.m, anchor: parent }) }
       }
 
       // The quick react button beside the bubble, on hover.
@@ -248,7 +258,7 @@ Item {
         anchors.topMargin: mi.topGap - r.t.sp(2)
         visible: mi.selecting
         cursorShape: Qt.PointingHandCursor
-        onClicked: r.view.toggleSelect(mi.m)
+        onClicked: mi.toggle()
       }
     }
   }

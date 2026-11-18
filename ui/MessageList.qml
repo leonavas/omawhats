@@ -123,7 +123,7 @@ Item {
 
   function indexOfKey(key) {
     var r = root.rows
-    for (var i = 0; i < r.length; i++) if (r[i].key === key) return i
+    for (var i = 0; i < r.length; i++) if (Model.holds(r[i], key)) return i
     return -1
   }
 
