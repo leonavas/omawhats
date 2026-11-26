@@ -285,6 +285,10 @@ func (b *Bridge) storeIncoming(e *events.Message, status int, expires int64) *Ms
 		}
 	}
 	b.dirty.Store(true)
+	// The votes a poll comes with from the phone (a history sync, a resend).
+	for _, pu := range e.SourceWebMsg.GetPollUpdates() {
+		b.vote(m.Chat, m.ID, b.reactionSender(chat, pu.GetPollUpdateMessageKey()), pu.GetVote().GetSelectedOptions(), pu.GetSenderTimestampMS()/1000)
+	}
 	// As stored, with its media and names; `fresh` is this call's to say
 	// (the row read back can't know it), and makes it news (handle).
 	out := b.load(m.Chat, m.ID)
@@ -582,9 +586,6 @@ func (b *Bridge) historyMessage(jid, chat types.JID, web *waWeb.WebMessageInfo) 
 	b.setBizName(chat.String(), biz)
 	for _, r := range web.GetReactions() {
 		b.react(chat.String(), web.GetKey().GetID(), b.reactionSender(chat, r.GetKey()), r.GetText(), r.GetSenderTimestampMS()/1000)
-	}
-	for _, pu := range web.GetPollUpdates() {
-		b.vote(chat.String(), web.GetKey().GetID(), b.reactionSender(chat, pu.GetPollUpdateMessageKey()), pu.GetVote().GetSelectedOptions(), pu.GetSenderTimestampMS()/1000)
 	}
 	if web.GetStarred() {
 		b.db.Exec(`UPDATE messages SET starred = 1 WHERE chat = ? AND id = ?`, chat.String(), web.GetKey().GetID())
