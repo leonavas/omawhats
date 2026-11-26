@@ -144,6 +144,10 @@ func (b *Bridge) storeIncoming(e *events.Message, status int, expires int64) *Ms
 		}
 		return nil
 	}
+	// A vote changes the poll it's on.
+	if pu := e.Message.GetPollUpdateMessage(); pu != nil {
+		return b.pollUpdate(e, chat, pu)
+	}
 	pm := e.Message.GetProtocolMessage()
 	if sm := e.Message.GetSecretEncryptedMessage(); sm != nil {
 		if pm = b.sealedEdit(e, sm); pm == nil {
@@ -167,6 +171,7 @@ func (b *Bridge) storeIncoming(e *events.Message, status int, expires int64) *Ms
 			b.db.Exec(`UPDATE messages SET kind = 'revoked', text = '', x = '', edited = 0, card = '' WHERE chat = ? AND id = ?`, chat.String(), id)
 			b.db.Exec(`DELETE FROM media WHERE chat = ? AND id = ?`, chat.String(), id)
 			b.db.Exec(`DELETE FROM reactions WHERE chat = ? AND id = ?`, chat.String(), id)
+			b.db.Exec(`DELETE FROM votes WHERE chat = ? AND id = ?`, chat.String(), id)
 			b.db.Exec(`DELETE FROM receipts WHERE chat = ? AND id = ?`, chat.String(), id)
 		case waE2E.ProtocolMessage_MESSAGE_EDIT:
 			c, ok := contentOf(pm.GetEditedMessage())
@@ -577,6 +582,9 @@ func (b *Bridge) historyMessage(jid, chat types.JID, web *waWeb.WebMessageInfo) 
 	b.setBizName(chat.String(), biz)
 	for _, r := range web.GetReactions() {
 		b.react(chat.String(), web.GetKey().GetID(), b.reactionSender(chat, r.GetKey()), r.GetText(), r.GetSenderTimestampMS()/1000)
+	}
+	for _, pu := range web.GetPollUpdates() {
+		b.vote(chat.String(), web.GetKey().GetID(), b.reactionSender(chat, pu.GetPollUpdateMessageKey()), pu.GetVote().GetSelectedOptions(), pu.GetSenderTimestampMS()/1000)
 	}
 	if web.GetStarred() {
 		b.db.Exec(`UPDATE messages SET starred = 1 WHERE chat = ? AND id = ?`, chat.String(), web.GetKey().GetID())

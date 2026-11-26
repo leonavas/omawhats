@@ -53,7 +53,7 @@ omarchy plugin remove leonavas.whatsapp-claude && omarchy plugin add https://git
   archived chats, pins, mutes, and search across chats and messages.
 - History synced from the phone; older messages load as you scroll.
 - Images, videos, GIFs, stickers, documents, voice notes (waveform, 1.5×/2×),
-  locations, contacts, polls and events.
+  locations, contacts, events, and polls you vote on here, with who voted.
 - Replies, reactions, edits, delete for everyone, forward, star; read
   receipts, typing and online status.
 - A composer with formatting, emoji and stickers, attachments, pasted

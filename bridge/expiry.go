@@ -234,7 +234,7 @@ func (b *Bridge) expireMessages() {
 		if err == nil {
 			_, err = tx.Exec(`UPDATE messages SET quote_from='', quote_kind='expired', quote_text='', quote_thumb='' WHERE chat=? AND quote_id=?`, e.chat, e.id)
 		}
-		for _, table := range []string{"media", "reactions", "receipts"} {
+		for _, table := range []string{"media", "reactions", "votes", "receipts"} {
 			if err == nil {
 				_, err = tx.Exec(`DELETE FROM `+table+` WHERE chat=? AND id=?`, e.chat, e.id)
 			}

@@ -807,6 +807,8 @@ Item {
     wa.send({ c: "send_file", chat: chat, path: path, kind: kind || U.kindOf(path), caption: caption || "", reply: reply || "", temp: !!temp })
   }
   function react(m, emoji) { wa.send({ c: "react", chat: m.chat, id: m.id, text: emoji }) }
+  // A poll's options picked by name; none takes the vote back.
+  function vote(m, options) { wa.send({ c: "vote", chat: m.chat, id: m.id, options: options }) }
   function edit(m, text) { wa.send({ c: "edit", chat: m.chat, id: m.id, text: text }) }
   function deleteMsgs(chat, ids, everyone) { wa.send({ c: "delete_msgs", chat: chat, ids: ids, everyone: !!everyone }) }
   function star(chat, ids, on) { wa.send({ c: "star", chat: chat, ids: ids, action: on ? "star" : "unstar" }) }

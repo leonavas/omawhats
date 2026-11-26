@@ -27,7 +27,7 @@ func (b *Bridge) removeMsgs(chat string, ids []string) {
 		args = append(args, id)
 	}
 	in := `chat = ? AND id IN (?` + strings.Repeat(", ?", len(ids)-1) + `)`
-	for _, t := range []string{"messages", "media", "reactions", "receipts"} {
+	for _, t := range []string{"messages", "media", "reactions", "votes", "receipts"} {
 		b.db.Exec(`DELETE FROM `+t+` WHERE `+in, args...)
 	}
 	b.dirty.Store(true)
@@ -99,6 +99,7 @@ func (b *Bridge) revoke(chat string, ids []string) {
 		b.db.Exec(`UPDATE messages SET kind = 'revoked', text = '', x = '', edited = 0, card = '' WHERE chat = ? AND id = ?`, chat, id)
 		b.db.Exec(`DELETE FROM media WHERE chat = ? AND id = ?`, chat, id)
 		b.db.Exec(`DELETE FROM reactions WHERE chat = ? AND id = ?`, chat, id)
+		b.db.Exec(`DELETE FROM votes WHERE chat = ? AND id = ?`, chat, id)
 		b.db.Exec(`DELETE FROM receipts WHERE chat = ? AND id = ?`, chat, id)
 		b.emitMsg(chat, id)
 	}

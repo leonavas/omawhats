@@ -55,7 +55,9 @@ type Msg struct {
 	Quote     *Quote     `json:"quote,omitempty"`
 	Mentions  []Mention  `json:"mentions,omitempty"`
 	Reactions []Reaction `json:"reactions,omitempty"`
-	Media     *Media     `json:"media,omitempty"`
+	// A poll's votes, one per option in its order; none until someone votes.
+	Votes []PollVote `json:"votes,omitempty"`
+	Media *Media     `json:"media,omitempty"`
 	// What the kind has besides text: link, loc, contacts, poll, event,
 	// invite, call, sys, of (a view-once's kind).
 	X    json.RawMessage `json:"x,omitempty"`
@@ -166,6 +168,8 @@ type Cmd struct {
 	Exec  string `json:"exec"`
 	// send: the preview of its link the app showed, to go along.
 	Preview *LinkPreview `json:"preview"`
+	// vote: the poll's options picked (none takes the vote back).
+	Options []string `json:"options"`
 }
 
 var (
@@ -365,6 +369,8 @@ func (b *Bridge) commands() {
 			go b.linkPreview(c.Text)
 		case "react":
 			go b.sendReaction(c.Chat, c.ID, c.Text)
+		case "vote":
+			go b.sendVote(c.Chat, c.ID, c.Options)
 		case "edit":
 			go b.edit(c.Chat, c.ID, c.Text)
 		case "delete_msgs":
@@ -587,7 +593,7 @@ func skip(chat types.JID) bool {
 // downloads. For a logout, from here or from the phone, and for a start
 // without a session, so a new one never shows the last one's chats.
 func (b *Bridge) wipe() {
-	for _, t := range []string{"chats", "messages", "media", "reactions", "receipts", "fav_stickers", "meta"} {
+	for _, t := range []string{"chats", "messages", "media", "reactions", "votes", "receipts", "fav_stickers", "meta"} {
 		b.db.Exec("DELETE FROM " + t)
 	}
 	b.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")

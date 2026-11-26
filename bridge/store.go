@@ -1,7 +1,7 @@
 package main
 
 // The app's own database (app.db): chats, messages, their media's keys,
-// reactions and a few flags. whatsmeow keeps the session, contacts and
+// reactions, poll votes and a few flags. whatsmeow keeps the session, contacts and
 // keys in session.db.
 
 import (
@@ -95,6 +95,16 @@ CREATE TABLE IF NOT EXISTS reactions (
 	emoji TEXT NOT NULL,
 	ts INTEGER NOT NULL,
 	PRIMARY KEY (chat, id, sender)
+);
+-- One vote per poll and voter, the newest; options are the picked
+-- options' SHA-256 (hex, comma separated), empty when taken back.
+CREATE TABLE IF NOT EXISTS votes (
+	chat TEXT NOT NULL,
+	id TEXT NOT NULL,
+	voter TEXT NOT NULL,
+	options TEXT NOT NULL,
+	ts INTEGER NOT NULL,
+	PRIMARY KEY (chat, id, voter)
 );
 -- Who got, read and played your messages, and when (the first time of
 -- each, 0 until then): WhatsApp Web's "Message info".
@@ -515,6 +525,7 @@ func (b *Bridge) query(where string, args ...any) []Msg {
 	}
 	rows.Close()
 	b.withReactions(out)
+	b.withVotes(out)
 	return out
 }
 

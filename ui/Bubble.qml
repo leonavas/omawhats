@@ -649,24 +649,92 @@ Item {
   Component {
     id: pollC
     Column {
+      id: pc
       readonly property var poll: b.x_.poll || { options: [] }
+      readonly property var votes: b.m.votes || []
+      readonly property bool canVote: { var c = b.wa.chat(b.m.chat); return !(c && c.ro) }
+      // Who voted, each once, for the bars and the footer.
+      readonly property int voters: {
+        var seen = {}
+        votes.forEach(function(v) { (v.by || []).forEach(function(p) { seen[p.jid] = true }) })
+        return Object.keys(seen).length
+      }
       property real natural: Math.min(b.innerMax, b.t.sp(320))
       spacing: b.t.sp(6)
+      // Picking one: alone when the poll takes one, added or taken out
+      // when it takes more; picking yours alone again takes the vote back.
+      function pick(i) {
+        var opts = poll.options, out = []
+        if (poll.multi) {
+          for (var k = 0; k < opts.length; k++) {
+            var on = !!(votes[k] && votes[k].mine)
+            if (k === i ? !on : on) out.push(opts[k])
+          }
+        } else if (!(votes[i] && votes[i].mine)) {
+          out.push(opts[i])
+        }
+        b.wa.vote(b.m, out)
+      }
       Text { textFormat: Text.PlainText; width: parent.width; text: b.m.text; color: b.t.textBright; font.family: b.t.font; font.pixelSize: b.t.fsMsg + 1; font.weight: Font.Medium; wrapMode: Text.Wrap; topPadding: b.t.sp(4) }
       Row {
         spacing: b.t.sp(4)
-        Icon { name: parent.parent.poll.multi ? "checklist" : "check"; size: b.t.sp(14); color: b.t.faint; anchors.verticalCenter: parent.verticalCenter }
-        Text { textFormat: Text.PlainText; text: parent.parent.poll.multi ? b.app.tr("Select one or more", "Selecione uma ou mais opções") : b.app.tr("Select one", "Selecione uma opção"); color: b.t.faint; font.family: b.t.font; font.pixelSize: b.t.fsSmall }
+        Icon { name: pc.poll.multi ? "checklist" : "check"; size: b.t.sp(14); color: b.t.faint; anchors.verticalCenter: parent.verticalCenter }
+        Text { textFormat: Text.PlainText; text: pc.poll.multi ? b.app.tr("Select one or more", "Selecione uma ou mais opções") : b.app.tr("Select one", "Selecione uma opção"); color: b.t.faint; font.family: b.t.font; font.pixelSize: b.t.fsSmall }
       }
       Repeater {
-        model: parent.poll.options
-        delegate: Row {
+        model: pc.poll.options
+        delegate: Item {
+          id: opt
           required property var modelData
-          spacing: b.t.sp(10)
-          topPadding: b.t.sp(4)
-          bottomPadding: b.t.sp(4)
-          Rectangle { width: b.t.sp(20); height: width; radius: parent.parent.poll.multi ? b.t.sp(4) : width / 2; color: "transparent"; border.width: 2; border.color: b.t.faint; anchors.verticalCenter: parent.verticalCenter }
-          Text { textFormat: Text.PlainText; width: b.t.sp(250); text: modelData; color: b.t.text; font.family: b.t.font; font.pixelSize: b.t.fsMsg; wrapMode: Text.Wrap; anchors.verticalCenter: parent.verticalCenter }
+          required property int index
+          readonly property var v: pc.votes[index] || { count: 0 }
+          readonly property bool on: !!v.mine
+          width: pc.width
+          height: optCol.height
+          Column {
+            id: optCol
+            width: parent.width
+            spacing: b.t.sp(6)
+            topPadding: b.t.sp(4)
+            bottomPadding: b.t.sp(4)
+            Row {
+              width: parent.width
+              spacing: b.t.sp(10)
+              Rectangle {
+                id: box
+                width: b.t.sp(20); height: width
+                radius: pc.poll.multi ? b.t.sp(4) : width / 2
+                color: opt.on ? b.t.brand : "transparent"
+                border.width: opt.on ? 0 : 2
+                border.color: b.t.faint
+                anchors.verticalCenter: parent.verticalCenter
+                Icon { anchors.centerIn: parent; visible: opt.on; name: "check"; size: b.t.sp(14); color: b.t.onBrand }
+              }
+              Text { textFormat: Text.PlainText; width: parent.width - box.width - count.width - parent.spacing * 2; text: opt.modelData; color: b.t.text; font.family: b.t.font; font.pixelSize: b.t.fsMsg; wrapMode: Text.Wrap; anchors.verticalCenter: parent.verticalCenter }
+              Text { id: count; textFormat: Text.PlainText; text: opt.v.count > 0 ? String(opt.v.count) : ""; color: b.t.dim; font.family: b.t.font; font.pixelSize: b.t.fsSmall; anchors.verticalCenter: parent.verticalCenter }
+            }
+            // Its share of the voters.
+            Rectangle {
+              x: box.width + b.t.sp(10)
+              width: parent.width - x
+              height: b.t.sp(6)
+              radius: height / 2
+              color: b.t.line
+              Rectangle {
+                width: pc.voters > 0 ? parent.width * opt.v.count / pc.voters : 0
+                height: parent.height
+                radius: parent.radius
+                color: b.t.brand
+                Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+              }
+            }
+          }
+          MouseArea {
+            anchors.fill: parent
+            enabled: pc.canVote && !(b.view && b.view.selecting)
+            cursorShape: Qt.PointingHandCursor
+            onClicked: pc.pick(opt.index)
+          }
         }
       }
       Rectangle { width: parent.width; height: 1; color: b.t.line }
@@ -674,11 +742,18 @@ Item {
         textFormat: Text.PlainText
         width: parent.width
         horizontalAlignment: Text.AlignHCenter
-        text: b.app.tr("Vote on your phone", "Vote pelo celular")
-        color: b.t.faint
+        text: b.app.tr("View votes", "Ver votos")
+        color: pc.voters > 0 ? b.t.link : b.t.faint
         font.family: b.t.font
         font.pixelSize: b.t.fsSmall + 0.5
+        font.weight: Font.Medium
         bottomPadding: b.t.sp(14)
+        MouseArea {
+          anchors.fill: parent
+          enabled: pc.voters > 0
+          cursorShape: Qt.PointingHandCursor
+          onClicked: b.win.dialog("votes", { msg: b.m })
+        }
       }
     }
   }

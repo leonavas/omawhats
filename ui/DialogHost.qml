@@ -86,6 +86,7 @@ Item {
       case "sendFiles": return filesC
       case "editMsg": return editC
       case "reactions": return reactionsC
+      case "votes": return votesC
       case "emoji": return emojiC
       case "shortcuts": return shortcutsC
       case "profile": return profileC
@@ -669,6 +670,63 @@ Item {
             badge: modelData.emoji
             badgeEmoji: true
             onClicked: { if (modelData.name === "") host.wa.react(rf.m, ""); else host.win.showProfile(modelData.jid); host.hide() }
+          }
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ poll votes
+  // WhatsApp Web's "Poll details": the question, then each option with
+  // how many voted for it and who.
+  Component {
+    id: votesC
+    DFrame {
+      id: vf
+      readonly property var m: host.args.msg
+      readonly property var latest: { var x = host.wa.findMsg(m.chat, m.id); return x || m }
+      readonly property var options: (L.parseX(vf.latest.x).poll || { options: [] }).options
+      readonly property var votes: vf.latest.votes || []
+      title: host.app.tr("Poll details", "Detalhes da enquete")
+      cardWidth: host.t.sp(440)
+      Flickable {
+        width: parent.width
+        height: Math.min(contentHeight, host.t.sp(460))
+        contentHeight: vcol.height
+        clip: true
+        Column {
+          id: vcol
+          width: parent.width
+          spacing: host.t.sp(14)
+          Text { textFormat: Text.PlainText; width: parent.width; text: vf.latest.text || ""; color: host.t.textBright; font.family: host.t.font; font.pixelSize: host.t.fsMsg + 1; font.weight: Font.Medium; wrapMode: Text.Wrap }
+          Repeater {
+            model: vf.options
+            delegate: Column {
+              id: oc
+              required property var modelData
+              required property int index
+              readonly property var v: vf.votes[index] || { count: 0, by: [] }
+              width: vcol.width
+              spacing: host.t.sp(4)
+              Row {
+                width: parent.width
+                Text { textFormat: Text.PlainText; width: parent.width - n.width; text: oc.modelData; color: host.t.text; font.family: host.t.font; font.pixelSize: host.t.fsMsg; font.weight: Font.Medium; wrapMode: Text.Wrap }
+                Text { id: n; textFormat: Text.PlainText; text: oc.v.count === 1 ? host.app.tr("1 vote", "1 voto") : host.app.tr(oc.v.count + " votes", oc.v.count + " votos"); color: host.t.dim; font.family: host.t.font; font.pixelSize: host.t.fsSmall }
+              }
+              Repeater {
+                model: oc.v.by || []
+                delegate: PersonRow {
+                  required property var modelData
+                  width: vcol.width + host.t.sp(24)
+                  x: -host.t.sp(12)
+                  app: host.app
+                  jid: modelData.name === "" ? (host.wa.me ? host.wa.me.jid : "") : modelData.jid
+                  name: modelData.name === "" ? host.app.tr("You", "Você") : String(modelData.name).replace(/^~/, "")
+                  onClicked: { if (modelData.name !== "") { host.win.showProfile(modelData.jid); host.hide() } }
+                }
+              }
+              Rectangle { width: parent.width; height: 1; color: host.t.line; visible: oc.index < vf.options.length - 1 }
+            }
           }
         }
       }
