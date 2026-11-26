@@ -285,6 +285,9 @@ func (b *Bridge) storeIncoming(e *events.Message, status int, expires int64) *Ms
 		}
 	}
 	b.dirty.Store(true)
+	if c.Kind == "poll" && e.SourceWebMsg != nil {
+		logf("poll %s from the phone: %d votes", m.ID, len(e.SourceWebMsg.GetPollUpdates()))
+	}
 	// The votes a poll comes with from the phone (a history sync, a resend).
 	for _, pu := range e.SourceWebMsg.GetPollUpdates() {
 		b.vote(m.Chat, m.ID, b.reactionSender(chat, pu.GetPollUpdateMessageKey()), pu.GetVote().GetSelectedOptions(), pu.GetSenderTimestampMS()/1000)
